@@ -4,7 +4,7 @@ import c from './login.module.scss';
 
 async function loginRequest({ login, password }) {
   // ЗАМЕНИ url на свой
-  const res = await fetch('http://127.0.0.1:8000/api/auth/login', {
+  const res = await fetch('https://aristokratamanat.pythonanywhere.com/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include', // чтобы сервер мог выставить httpOnly cookie
