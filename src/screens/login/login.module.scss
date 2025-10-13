@@ -1,0 +1,172 @@
+/* ===== login.module.scss (mobile-first) ===== */
+
+:root {
+  --topbar-h: 64px;          /* высота твоей верхней синей панели */
+}
+
+/* страница */
+.loginPage {
+  width: 100%;
+  min-height: 100dvh;        /* корректная высота на мобильных */
+  // padding:
+  //   calc(env(safe-area-inset-top, 0px) + var(--topbar-h) + 16px)
+  //   16px
+  //   calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background: #eef1f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* если нет топбара на каких-то экранах — просто обнули высоту */
+  &.noTopbar { --topbar-h: 0px; }
+}
+
+/* карточка */
+.card {
+  width: 80%;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  padding: clamp(18px, 3.5vw, 28px);
+}
+
+/* заголовок */
+.header {
+  text-align: center;
+  margin-bottom: clamp(10px, 2vw, 18px);
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: clamp(22px, 4.8vw, 30px);
+    color: #082e55;
+  }
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: clamp(13px, 3.5vw, 16px);
+  }
+}
+
+/* форма */
+.form { display: grid; gap: 14px; }
+
+.label {
+  font-size: 14px;
+  color: #1f2937;
+  display: grid;
+  gap: 8px;
+}
+
+/* инпуты: минимум 16px шрифт — чтобы iOS не зумил экран */
+.input {
+  height: 52px;
+  border: 2px solid #d1d5db;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 16px;           /* важно для мобильных */
+  background: #fff;
+  transition: border-color .15s ease, box-shadow .15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #082e55;
+    box-shadow: 0 0 0 4px rgba(8,46,85,.12);
+  }
+
+  &.error {
+    border-color: #e63946;
+    box-shadow: 0 0 0 4px rgba(230,57,70,.12);
+  }
+}
+
+/* глазик в пароле — без сдвига layout */
+.passWrap { position: relative; }
+.eye {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px;
+}
+
+/* чекбокс/ссылка в одну линию и не прыгают */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+
+  input { width: 18px; height: 18px; accent-color: #082e55; }
+}
+
+.linkBtn {
+  border: none;
+  background: transparent;
+  color: #082e55;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+
+  &:hover { color: #0a3766; text-decoration: underline; }
+}
+
+/* сообщение об ошибке */
+.errorBox {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+/* кнопка отправки: фиксируем поведение на узких экранах */
+.submit {
+  height: 54px;
+  border: none;
+  border-radius: 14px;
+  background: #082e55;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: transform .05s ease, background .15s ease, opacity .15s ease;
+
+  &:hover { background: #0a3766; }
+  &:active { transform: translateY(1px); }
+  &:disabled { opacity: .6; cursor: not-allowed; }
+}
+
+/* ===== медиазапросы ===== */
+
+/* планшеты: немного больше сетка/поля */
+@media (min-width: 600px) {
+  .loginPage {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .form { gap: 16px; }
+}
+
+/* десктопы: центрируем сильнее и увеличиваем внутренние отступы карточки */
+@media (min-width: 1024px) {
+  .loginPage {
+    place-items: center;                /* теперь почти по центру на десктопе */
+    padding-top: calc(var(--topbar-h) + 32px);
+  }
+  .card { padding: 32px; }
+}

@@ -1,0 +1,52 @@
+.main{
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 84px;
+  gap: 20px;
+  .logo{
+    width: 90%;
+    height: 120px;
+    background: #003463;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    img{
+      height: 80%;
+    }
+  }
+  button{
+    width: 90%;
+    height: 60px;
+    background: #003463;
+    border-radius: 20px;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+  }
+
+  .elevators{
+    width: 90%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    button{
+      width: 100%;
+      height: 100px;
+    }
+  }
+  .doors{
+    width: 90%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    button{
+      width: 23%;
+      height: 100px;
+      font-size: 14px;
+    }
+  }
+}

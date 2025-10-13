@@ -1,25 +1,25 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react'
+import axios from 'axios'
+import { MainRoutes } from './routes';
+import './App.scss'
+import { Components } from './components';
+import { useNavigate } from 'react-router-dom';
+
+axios.defaults.baseURL = 'https://aristokratamanat.pythonanywhere.com'
 
 function App() {
+  const Navigate = useNavigate()
+  const path = window.location.pathname
+  React.useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken')
+    if(!accessToken) Navigate('/login')
+  }, [path])
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <Components.Navbar />
+      <MainRoutes />
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
