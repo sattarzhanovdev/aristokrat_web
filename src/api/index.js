@@ -71,3 +71,9 @@ export async function saveResidentEntranceNo(no) {
   });
   return prof?.entrance_no ?? null;
 }
+
+
+export async function getIsAdmin() {
+  const me = await fetchJson('/api/auth/me');
+  return Boolean(me.is_superuser || me.is_staff);
+}
