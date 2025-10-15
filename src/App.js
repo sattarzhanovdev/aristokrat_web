@@ -4,8 +4,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { MainRoutes } from './routes';
 import { Components } from './components';
 import './App.scss';
-import { tryRefreshAccessToken, getMe, getResidentProfileMe } from './api';
+import { tryRefreshAccessToken, getMe, getResidentProfileMe, fetchJson } from './api';
 import { clearTokens } from './api/axios';
+import axios from 'axios';
 
 // универсальная проверка флага "активен"
 function isActiveResidentFlag(p) {
@@ -96,6 +97,24 @@ export default function App() {
 
     return () => { canceled = true; unmark(); };
   }, [pathname, navigate]);
+
+  React.useEffect(() => {
+    if(localStorage.getItem('accessToken')  || sessionStorage.getItem('accessToken')){
+      getResidentProfileMe()
+      .then((prof) => {
+        fetchJson('/api/apartments')
+          .then((apts) => {
+            const apt = apts.results.find((a) => a.number === prof.username);
+            
+            if (apt && apt.is_blocked) {
+              clearTokens();
+              alert('Ваше жильё заблокировано. Пожалуйста, обратитесь к администратору.');
+              navigate('/login', { replace: true });
+            }
+          })
+      })
+    }
+  }, [pathname]);
 
   // Можно показать лёгкий лоадер, но НЕ возвращать null надолго
   if (!ready) return <div style={{height:'100vh'}} />;
