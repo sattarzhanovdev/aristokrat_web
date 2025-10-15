@@ -49,4 +49,35 @@
       font-size: 14px;
     }
   }
+  .grid{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    button{
+      width: 100%;
+      margin-bottom: 10px;
+      &:disabled{
+        background: rgb(116, 0, 0);
+      }
+    }
+    .entranceCard{
+      width: 100%;
+      display: flex;
+      align-items: center;
+      flex-direction: column;
+      gap: 10px;
+      .entranceTitle{
+        margin-bottom: 10px;
+      }
+      button{
+        width: 100%;
+        margin-bottom: 10px;
+        &:disabled{
+          background: rgb(116, 0, 0);
+        }
+      }
+    }
+  }
 }

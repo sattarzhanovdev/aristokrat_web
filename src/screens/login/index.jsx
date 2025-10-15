@@ -1,59 +1,99 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import c from './login.module.scss';
 
-async function loginRequest({ login, password }) {
-  // ЗАМЕНИ url на свой
-  const res = await fetch('https://aristokratamanat.pythonanywhere.com/api/auth/login', {
+const API = 'https://aristokratamanat.pythonanywhere.com';
+
+// --- helpers ---
+async function postJson(url, body) {
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include', // чтобы сервер мог выставить httpOnly cookie
-    body: JSON.stringify({ login, password }),
+    credentials: 'include', // чтоб сервер мог выставить httpOnly cookie
+    body: JSON.stringify(body),
   });
-
-  // ожидаем формат { accessToken?: string, user?: {}, message?: string }
+  const ct = res.headers.get('content-type') || '';
+  const data = ct.includes('application/json') ? await res.json() : await res.text();
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || 'Ошибка авторизации');
+    const msg = typeof data === 'object' && data?.message ? data.message : (data || res.statusText);
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
-  return res.json();
+  return data;
+}
+async function getJson(url) {
+  const res = await fetch(url, { credentials: 'include' });
+  const data = await res.json();
+  if (!res.ok) {
+    const err = new Error(data?.message || res.statusText);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
-const Login = () => {
+// --- validators ---
+const isEmail = (v) => /\S+@\S+\.\S+/.test(v);
+const isPhone = (v) => /^\+?\d{10,15}$/.test(v.replace(/\s|-/g, ''));
+const isApt   = (v) => /^\d{1,4}$/.test(v); // сохранит "001"
+
+export default function Login() {
   const navigate = useNavigate();
-  const [login, setLogin] = useState('');        // email или телефон
+
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isEmail = (v) => /\S+@\S+\.\S+/.test(v);
-  const isPhone = (v) => /^\+?\d{10,15}$/.test(v.replace(/\s|-/g, ''));
-  const isValidLogin = isEmail(login) || isPhone(login);
-  const isValidPassword = password.length >= 6;
-  const isFormValid = isValidLogin && isValidPassword;
+  // валидность
+  const validLogin = true
+  const validPass  = true;
+  const canSubmit  = true;
+
+  const storage = remember ? localStorage : sessionStorage;
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    if (!isFormValid || loading) return;
+    if (!canSubmit) return;
+
     setLoading(true);
     setError('');
 
     try {
-      const data = await loginRequest({ login, password });
+      // 1) логин
+      const data = await postJson(`${API}/api/auth/login`, { login, password });
 
-      // В идеале сервер кладёт refreshToken в httpOnly cookie.
-      // Если он ещё отдаёт accessToken — можно временно хранить его:
-      if (data.accessToken && remember) {
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.accessToken) storage.setItem('accessToken', data.accessToken);
+      if (data.refreshToken) storage.setItem('refreshToken', data.refreshToken);
+
+      // 2) разрешаем вход только активным жильцам
+      try {
+        const prof = await getJson(`${API}/api/profile/me`);
+        const isActive =
+          (typeof prof?.is_active_resident !== 'undefined' ? prof.is_active_resident :
+          (typeof prof?.is_active !== 'undefined'          ? prof.is_active :
+          (typeof prof?.active !== 'undefined'             ? prof.active : true)));
+
+        if (!isActive) {
+          storage.removeItem('accessToken');
+          storage.removeItem('refreshToken');
+          throw new Error('Ваш профиль не активен. Обратитесь к администратору.');
+        }
+      } catch (e2) {
+        // если профиль недоступен по сети — не блокируем авторизацию
       }
 
-      // редирект куда нужно
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err.message);
+      // понятные сообщения
+      if (err.status === 400 || err.status === 401) {
+        setError(err.message || 'Неверный логин или пароль');
+      } else {
+        setError(err.message || 'Не удалось войти. Попробуйте ещё раз.');
+      }
     } finally {
       setLoading(false);
     }
@@ -64,27 +104,31 @@ const Login = () => {
       <div className={c.card}>
         <div className={c.header}>
           <h1>Вход</h1>
-          <p>Введите номер телефона и пароль, чтобы продолжить</p>
+          <p>Введите номер квартиры и пароль, чтобы продолжить</p>
         </div>
 
         <form className={c.form} onSubmit={onSubmit} noValidate>
           <label className={c.label}>
-            Номер телефона
+            Номер квартиры (или email/телефон)
             <input
-              className={`${c.input} ${login && !isValidLogin ? c.error : ''}`}
+              className={`${c.input} ${login && !validLogin ? c.error : ''}`}
               type="text"
-              placeholder="+996555555555"
+              placeholder="001"
               value={login}
-              onChange={(e) => setLogin(e.target.value.trim())}
+              onChange={(e) => setLogin(e.target.value)} // не убираем ведущие нули
               autoComplete="username"
+              inputMode="text"
             />
+            {!validLogin && login && (
+              <span className={c.hint}>Пример: 001 • user@mail.com • +79990000000</span>
+            )}
           </label>
 
           <label className={c.label}>
             Пароль
             <div className={c.passWrap}>
               <input
-                className={`${c.input} ${password && !isValidPassword ? c.error : ''}`}
+                className={`${c.input} ${password && !validPass ? c.error : ''}`}
                 type={showPass ? 'text' : 'password'}
                 placeholder="Минимум 6 символов"
                 value={password}
@@ -100,6 +144,7 @@ const Login = () => {
                 {showPass ? '🙈' : '👁️'}
               </button>
             </div>
+            {!validPass && password && <span className={c.hint}>Минимум 6 символов</span>}
           </label>
 
           <div className={c.row}>
@@ -111,29 +156,15 @@ const Login = () => {
               />
               Запомнить меня
             </label>
-
-            {/* <button
-              type="button"
-              className={c.linkBtn}
-              onClick={() => navigate('/forgot')}
-            >
-              Забыли пароль?
-            </button> */}
           </div>
 
           {error && <div className={c.errorBox}>{error}</div>}
 
-          <button
-            type="submit"
-            className={c.submit}
-            disabled={!isFormValid || loading}
-          >
+          <button type="submit" className={c.submit} disabled={!canSubmit}>
             {loading ? 'Входим…' : 'Войти'}
           </button>
         </form>
       </div>
     </div>
   );
-};
-
-export default Login;
+}
