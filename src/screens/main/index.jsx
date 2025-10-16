@@ -328,30 +328,32 @@ useEffect(() => {
                   >
                     Дверь
                   </button>
-                  <button
-                    className={cls("liftPass", no)}
-                    disabled={dis("liftPass", no)}
-                    onClick={() => pulse("liftPass", no)}
-                    title={
-                      remoteOn[keyId("liftPass", no)]
-                        ? "Недоступно: value=true"
-                        : ""
-                    }
-                  >
-                    Лифт (пасс.)
-                  </button>
-                  <button
-                    className={cls("liftGruz", no)}
-                    disabled={dis("liftGruz", no)}
-                    onClick={() => pulse("liftGruz", no)}
-                    title={
-                      remoteOn[keyId("liftGruz", no)]
-                        ? "Недоступно: value=true"
-                        : ""
-                    }
-                  >
-                    Лифт (груз.)
-                  </button>
+                  <div className={c.row}>
+                    <button
+                      className={cls("liftPass", no)}
+                      disabled={dis("liftPass", no)}
+                      onClick={() => pulse("liftPass", no)}
+                      title={
+                        remoteOn[keyId("liftPass", no)]
+                          ? "Недоступно: value=true"
+                          : ""
+                      }
+                    >
+                      Лифт (пасс.)
+                    </button>
+                    <button
+                      className={cls("liftGruz", no)}
+                      disabled={dis("liftGruz", no)}
+                      onClick={() => pulse("liftGruz", no)}
+                      title={
+                        remoteOn[keyId("liftGruz", no)]
+                          ? "Недоступно: value=true"
+                          : ""
+                      }
+                    >
+                      Лифт (груз.)
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

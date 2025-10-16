@@ -99,7 +99,7 @@ export default function App() {
   }, [pathname, navigate]);
 
   React.useEffect(() => {
-    if(localStorage.getItem('accessToken')  || sessionStorage.getItem('accessToken')){
+    if(localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken')){
       getResidentProfileMe()
       .then((prof) => {
         fetchJson('/api/apartments')
