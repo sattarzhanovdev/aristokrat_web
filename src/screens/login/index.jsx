@@ -64,14 +64,14 @@ export default function Login() {
 
     try {
       // 1) логин
-      const data = await postJson(`${API}/api/auth/login`, { login, password });
+      const data = await postJson(`${API}/api/auth/login/`, { login, password });
 
       if (data.accessToken) storage.setItem('accessToken', data.accessToken);
       if (data.refreshToken) storage.setItem('refreshToken', data.refreshToken);
 
       // 2) разрешаем вход только активным жильцам
       try {
-        const prof = await getJson(`${API}/api/profile/me`);
+        const prof = await getJson(`${API}/api/profile/me/`);
         const isActive =
           (typeof prof?.is_active_resident !== 'undefined' ? prof.is_active_resident :
           (typeof prof?.is_active !== 'undefined'          ? prof.is_active :
