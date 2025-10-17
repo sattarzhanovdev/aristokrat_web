@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import c from './profile.module.scss';
 import { BiArrowBack } from 'react-icons/bi';
 import { useNavigate } from 'react-router-dom';
-import { fetchJson } from '../../api';
+import { fetchJson, clearTokens } from "../../api";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -68,11 +68,9 @@ export default function Profile() {
   }, []);
 
   const logout = async () => {
-    try {
-      await fetchJson('/api/auth/logout', { method: 'POST' }); // важно: слеш на конце не нужен, путь такой же в urls.py
-    } catch {}
-    localStorage.removeItem('accessToken');
-    navigate('/login', { replace: true });
+    try { await fetchJson("/api/auth/logout", { method: "POST" }); } catch {}
+    clearTokens();
+    navigate("/login", { replace: true });
   };
 
   return (

@@ -1,7 +1,13 @@
 // Main.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import c from "./main.module.scss";
-import { getResidentEntranceNo, getIsAdmin } from "../../api";
+import {
+  getResidentEntranceNo,
+  getIsAdmin,
+  getPasswordStatus,
+  changePassword,
+  getApprovalStatus, // <--- НОВОЕ
+} from "../../api";
 import logo from "../../images/logo.svg";
 
 /* ================= Firebase RTDB Streaming (SSE) ================= */
@@ -26,16 +32,17 @@ const rtdbSetBoolean = async (path, value) => {
   }
 };
 
+// нормализация значений в boolean
 const toBool = (x) => {
-    if (x === true || x === false) return x;
-    if (x === 1 || x === 0) return !!x;
-    if (typeof x === 'string') {
-      const s = x.trim().toLowerCase();
-      if (s === 'true') return true;
-      if (s === 'false') return false;
-    }
-    return false;
-  };
+  if (x === true || x === false) return x;
+  if (x === 1 || x === 0) return !!x;
+  if (typeof x === "string") {
+    const s = x.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  return false;
+};
 
 // подписка на события put/patch по данному пути
 const subscribeStream = (path, onChange) => {
@@ -44,7 +51,6 @@ const subscribeStream = (path, onChange) => {
   const handler = (ev) => {
     try {
       const payload = JSON.parse(ev.data); // { path, data } или { path, data: {..} }
-      // payload.data может быть объектом, булем, null
       onChange(payload);
     } catch (_) {
       // ignore malformed chunks
@@ -53,7 +59,7 @@ const subscribeStream = (path, onChange) => {
   es.addEventListener("put", handler);
   es.addEventListener("patch", handler);
   es.onerror = () => {
-    // браузер сам попытается переподключиться; можем логировать при желании
+    // браузер сам переподключится
   };
   return () => es.close();
 };
@@ -63,10 +69,10 @@ const startPolling = (path, onChange, interval = 2000) => {
   let timer;
   const tick = async () => {
     try {
-      const res = await fetch(toUrl(path), { cache: 'no-store' });
+      const res = await fetch(toUrl(path), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json().catch(() => null);
-        onChange({ data, path: '/' });
+        onChange({ data, path: "/" });
       }
     } finally {
       timer = setTimeout(tick, interval);
@@ -107,19 +113,88 @@ const flattenEntrances = (dataObj) => {
   if (!dataObj || typeof dataObj !== "object") return out;
   Object.keys(dataObj).forEach((no) => {
     const e = dataObj[no] || {};
-    // допускаем разные варианты вложенности; берём только .value
-    out[keyId("door", no)]     = toBool(e.door?.value);
+    out[keyId("door", no)] = toBool(e.door?.value);
     out[keyId("liftPass", no)] = toBool(e.lift_pass?.value);
     out[keyId("liftGruz", no)] = toBool(e.lift_gruz?.value);
   });
   return out;
 };
 
+function PasswordChangeForm({ busy, error, onSubmit }) {
+  const [oldPwd, setOldPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [repeatPwd, setRepeatPwd] = useState("");
+
+  return (
+    <form
+      className={c.pwdForm}
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(oldPwd, newPwd, repeatPwd);
+      }}
+    >
+      <label>
+        Текущий пароль
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={oldPwd}
+          onChange={(e) => setOldPwd(e.target.value)}
+          disabled={busy}
+          required
+        />
+      </label>
+
+      <label>
+        Новый пароль
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newPwd}
+          onChange={(e) => setNewPwd(e.target.value)}
+          disabled={busy}
+          required
+          minLength={8}
+        />
+      </label>
+
+      <label>
+        Повторите новый пароль
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={repeatPwd}
+          onChange={(e) => setRepeatPwd(e.target.value)}
+          disabled={busy}
+          required
+          minLength={8}
+        />
+      </label>
+
+      {error && <div className={c.errorInline}>{error}</div>}
+
+      <div className={c.modalActions}>
+        <button type="submit" disabled={busy}>
+          {busy ? "Сохраняем..." : "Сменить пароль"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function Main() {
   const [entranceNo, setEntranceNo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // одобрен ли аккаунт
+  const [isApproved, setIsApproved] = useState(true);
+
+  // принудительная смена пароля
+  const [mustChangePwd, setMustChangePwd] = useState(false);
+  const [pwdBusy, setPwdBusy] = useState(false);
+  const [pwdErr, setPwdErr] = useState("");
 
   // локальные “импульсы” и временная блокировка
   const [active, setActive] = useState({});
@@ -128,19 +203,38 @@ export default function Main() {
   // серверные статусы: если true — кнопку дизэйблим
   const [remoteOn, setRemoteOn] = useState({}); // { 'door-3': true, 'kalitka1-global': false, ... }
 
-  // роль + подъезд
+  // роль + подъезд + статус одобрения + статус пароля
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-        const [adminFlag, no] = await Promise.all([
+        const [adminFlag, no, approval, pwd] = await Promise.all([
           getIsAdmin(),
           getResidentEntranceNo().catch(() => null),
+          getApprovalStatus(),   // ← {"status":"accepted"|"not_accepted"}
+          getPasswordStatus(),   // ← {"status":"updated"|"not_updated"}
         ]);
+
+        // проверка одобрения
+        if (approval?.status !== "accepted") {
+          setIsApproved(false);
+          alert("Ваш аккаунт еще не одобрен");
+          // можно здесь же сделать редирект, если нужно:
+          // window.location.href = "/logout";
+          return; // дальше не грузим UI
+        } else {
+          setIsApproved(true);
+        }
+
         setIsAdmin(adminFlag);
-        setEntranceNo(no != null ? Number(no) : null); // <-- число
+        setEntranceNo(no != null ? Number(no) : null);
+
         if (!adminFlag && !no) {
           setErr("В профиле нет номера подъезда. Обратитесь к администратору.");
+        }
+
+        if (pwd?.status === "not_updated") {
+          setMustChangePwd(true); // откроется модалка
         }
       } catch (e) {
         setErr(e?.message || "Не удалось получить данные профиля");
@@ -150,103 +244,91 @@ export default function Main() {
     })();
   }, []);
 
-  
   /* ---------- STREAM: подписки на RTDB, без опросов ---------- */
-  // 1) /entrances — общая для всех (и админа, и обычного)
-useEffect(() => {
-  // общий обработчик (и для SSE, и для polling)
-  const onEntrancesChange = ({ data, path }) => {
-    if (!data) return;
+  useEffect(() => {
+    if (!isApproved) return; // не подписываемся, если не одобрен
+    const onEntrancesChange = ({ data, path }) => {
+      if (!data) return;
 
-    // helper: нормализуем буль
-    const toBool = (x) => {
-      if (x === true || x === false) return x;
-      if (x === 1 || x === 0) return !!x;
-      if (typeof x === 'string') {
-        const s = x.trim().toLowerCase();
-        if (s === 'true') return true;
-        if (s === 'false') return false;
+      const pushFlat = (obj) => {
+        const upd = {};
+        Object.keys(obj || {}).forEach((no) => {
+          const e = obj[no] || {};
+          upd[`door-${no}`] = toBool(e?.door?.value);
+          upd[`liftPass-${no}`] = toBool(e?.lift_pass?.value);
+          upd[`liftGruz-${no}`] = toBool(e?.lift_gruz?.value);
+        });
+        if (Object.keys(upd).length) {
+          setRemoteOn((prev) => ({ ...prev, ...upd }));
+        }
+      };
+
+      if (path === "/" || path === "" || path == null) {
+        pushFlat(data);
+        return;
       }
-      return false;
+
+      const seg = String(path).split("/").filter(Boolean);
+      if (seg.length >= 3) {
+        const [no, which] = seg;
+        const id =
+          which === "door"
+            ? `door-${no}`
+            : which === "lift_pass"
+            ? `liftPass-${no}`
+            : which === "lift_gruz"
+            ? `liftGruz-${no}`
+            : null;
+        if (id) {
+          const v =
+            typeof data === "object" && data !== null && "value" in data
+              ? toBool(data.value)
+              : toBool(data);
+          setRemoteOn((prev) => ({ ...prev, [id]: v }));
+        }
+      } else if (seg.length === 1) {
+        const no = seg[0];
+        pushFlat({ [no]: data });
+      }
     };
 
-    // расплющить целый снэпшот подъездов
-    const pushFlat = (obj) => {
-      const upd = {};
-      Object.keys(obj || {}).forEach((no) => {
-        const e = obj[no] || {};
-        upd[`door-${no}`]     = toBool(e?.door?.value);
-        upd[`liftPass-${no}`] = toBool(e?.lift_pass?.value);
-        upd[`liftGruz-${no}`] = toBool(e?.lift_gruz?.value);
-      });
-      if (Object.keys(upd).length) {
-        setRemoteOn((prev) => ({ ...prev, ...upd }));
+    let stop = subscribeStream("/entrances", onEntrancesChange);
+
+    const safety = setTimeout(() => {
+      const hasAnything = Object.keys(remoteOn).some(
+        (k) =>
+          k.startsWith("door-") ||
+          k.startsWith("liftPass-") ||
+          k.startsWith("liftGruz-")
+      );
+      if (!hasAnything) {
+        stop?.();
+        stop = startPolling("/entrances", onEntrancesChange, 2000);
       }
-    };
+    }, 3000);
 
-    // path может быть '/' (полный снимок) или '/<no>/...' (точечный апдейт)
-    if (path === '/' || path === '' || path == null) {
-      pushFlat(data);
-      return;
-    }
-
-    const seg = String(path).split('/').filter(Boolean); // ['1','lift_pass','value'] или ['1']
-    if (seg.length >= 3) {
-      const [no, which] = seg;
-      const id =
-        which === 'door'
-          ? `door-${no}`
-          : which === 'lift_pass'
-          ? `liftPass-${no}`
-          : which === 'lift_gruz'
-          ? `liftGruz-${no}`
-          : null;
-      if (id) {
-        const v = toBool(typeof data === 'object' && data !== null && 'value' in data ? data.value : data);
-        setRemoteOn((prev) => ({ ...prev, [id]: v }));
-      }
-    } else if (seg.length === 1) {
-      // пришёл целиком один подъезд
-      const no = seg[0];
-      pushFlat({ [no]: data });
-    }
-  };
-
-  // 1) пробуем SSE
-  let stop = subscribeStream('/entrances', onEntrancesChange);
-
-  // 2) через 3с проверяем — если по подъездам не пришло ни одного ключа, переходим на polling
-  const safety = setTimeout(() => {
-    const hasAnything = Object.keys(remoteOn).some(
-      (k) => k.startsWith('door-') || k.startsWith('liftPass-') || k.startsWith('liftGruz-')
-    );
-    if (!hasAnything) {
+    return () => {
+      clearTimeout(safety);
       stop?.();
-      stop = startPolling('/entrances', onEntrancesChange, 2000);
-    }
-  }, 3000);
-
-  return () => {
-    clearTimeout(safety);
-    stop?.();
-  };
-  // remoteOn только для safety-проверки; если боишься лишних пересозданий — вынеси его в useRef
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
-
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isApproved]);
 
   // 2) Глобальные узлы: калитки и паркинг — отдельные стримы
   useEffect(() => {
+    if (!isApproved) return;
     const stops = ["kalitka1", "kalitka2", "kalitka3", "kalitka4", "parking"].map(
       (name) =>
         subscribeStream(`/${name}`, ({ data }) => {
-          const v = toBool(typeof data === "object" && data !== null && "value" in data ? data.value : data);
+          const v =
+            typeof data === "object" && data !== null && "value" in data
+              ? toBool(data.value)
+              : toBool(data);
           setRemoteOn((prev) => ({ ...prev, [keyId(name)]: v }));
         })
     );
     return () => stops.forEach((stop) => stop && stop());
-  }, []);
+  }, [isApproved]);
   /* ------------------------------------------------------------- */
 
   // анти-залипание: когда сервер сказал false — снимаем локальный busy
@@ -265,6 +347,7 @@ useEffect(() => {
 
   // отправка импульса: true -> 1s -> false
   const pulse = async (key, enNo = null) => {
+    if (!isApproved) return;
     const targetEntrance = enNo ?? entranceNo;
     const needsEntrance =
       key === "door" || key === "liftPass" || key === "liftGruz";
@@ -297,11 +380,63 @@ useEffect(() => {
   const cls = (key, enNo = null) => (active[keyId(key, enNo)] ? c.active : "");
   const dis = (key, enNo = null) => {
     const id = keyId(key, enNo);
-    return !!busy[id] || remoteOn[id] === true; // уже ок: undefined/false → кнопка активна
+    return !!busy[id] || remoteOn[id] === true;
   };
+
+  // Если аккаунт не одобрен — показываем простое сообщение (UI заблокирован)
+  if (!isApproved) {
+    return (
+      <div className={c.main}>
+        <div className={c.logo}>
+          <img src={logo} alt="logo" />
+        </div>
+        <div className={c.error}>
+          Ваш аккаунт ещё не одобрен. Пожалуйста, дождитесь подтверждения администратора.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={c.main}>
+      {/* Модалка принудительной смены пароля */}
+      {mustChangePwd && (
+        <div className={c.modalBackdrop}>
+          <div className={c.modal}>
+            <h3>Смена пароля</h3>
+            <p className={c.modalDesc}>
+              По требованиям безопасности вам нужно обновить пароль, чтобы
+              продолжить.
+            </p>
+
+            <PasswordChangeForm
+              busy={pwdBusy}
+              error={pwdErr}
+              onSubmit={async (oldPwd, newPwd, repeatPwd) => {
+                setPwdErr("");
+                if (!newPwd || newPwd.length < 8) {
+                  setPwdErr("Новый пароль должен быть не короче 8 символов.");
+                  return;
+                }
+                if (newPwd !== repeatPwd) {
+                  setPwdErr("Пароли не совпадают.");
+                  return;
+                }
+                try {
+                  setPwdBusy(true);
+                  await changePassword(oldPwd, newPwd);
+                  setMustChangePwd(false); // разблокируем UI
+                } catch (e) {
+                  setPwdErr(e?.message || "Ошибка при смене пароля");
+                } finally {
+                  setPwdBusy(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className={c.logo}>
         <img src={logo} alt="logo" />
       </div>

@@ -5,6 +5,7 @@
   align-items: center;
   margin-top: 84px;
   gap: 20px;
+  padding-bottom: 200px;
   .logo{
     width: 90%;
     height: 120px;
@@ -97,3 +98,29 @@
     }
   }
 }
+
+.modalBackdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal {
+  width: min(520px, 92vw);
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.modalDesc { margin: 6px 0 16px; color: #555; }
+
+.pwdForm {
+  display: grid; gap: 12px;
+  label { display: grid; gap: 6px; font-weight: 600; }
+  input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; }
+}
+
+.modalActions { margin-top: 8px; display: flex; justify-content: flex-end; }
+.errorInline { color: #b00020; font-size: 0.9rem; }

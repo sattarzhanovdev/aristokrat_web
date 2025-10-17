@@ -1,3 +1,4 @@
+// src/pages/Admin/Admin.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import c from './admin.module.scss';
 import { useNavigate } from 'react-router-dom';
@@ -18,12 +19,10 @@ const Admin = () => {
         const isSuper = Boolean(me.is_superuser);
         const isStaff = Boolean(me.is_staff);
         if (!isSuper && !isStaff) {
-          // нет прав — уводим на /
           navigate('/', { replace: true });
           return;
         }
       } catch (e) {
-        // если не авторизован/ошибка — тоже уводим на /
         navigate('/', { replace: true });
         return;
       } finally {
@@ -33,12 +32,12 @@ const Admin = () => {
     return () => { mounted = false; };
   }, [navigate]);
 
-  // UI state
-  const [entrance, setEntrance] = useState('all');   // селект "Выберите блок"
+  // === UI state ===
+  const [entrance, setEntrance] = useState('all');   // селект "Выберите подъезд"
   const [query, setQuery] = useState('');            // поиск
   const [selectedApartment, setSelectedApartment] = useState(null);
 
-  // data state
+  // === data state ===
   const [apartments, setApartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -51,6 +50,16 @@ const Admin = () => {
   }, [query]);
 
   // загрузка списка
+  const reloadList = async () => {
+    const params = new URLSearchParams();
+    if (entrance !== 'all') params.set('entrance', entrance);
+    if (debouncedQuery) params.set('search', debouncedQuery);
+
+    const data = await fetchJson(`/api/apartments?${params.toString()}`);
+    const list = Array.isArray(data) ? data : (data.results || []);
+    setApartments(list);
+  };
+
   useEffect(() => {
     if (!authChecked) return; // ждём проверку доступа
     let mounted = true;
@@ -58,15 +67,7 @@ const Admin = () => {
       try {
         setLoading(true);
         setErr('');
-
-        const params = new URLSearchParams();
-        // при желании можно фильтровать по дому: params.set('house','20')
-        if (entrance !== 'all') params.set('entrance', entrance);
-        if (debouncedQuery) params.set('search', debouncedQuery);
-
-        const data = await fetchJson(`/api/apartments?${params.toString()}`);
-        const list = Array.isArray(data) ? data : (data.results || []);
-        if (mounted) setApartments(list);
+        await reloadList();
       } catch (e) {
         if (mounted) setErr(e.message || 'Не удалось загрузить квартиры');
       } finally {
@@ -74,6 +75,7 @@ const Admin = () => {
       }
     })();
     return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked, entrance, debouncedQuery]);
 
   // открыть попап
@@ -99,26 +101,31 @@ const Admin = () => {
         setSelectedApartment(updated);
       } else {
         // ЗАБЛОКИРОВАТЬ
-        await fetchJson(`/api/apartments/${selectedApartment.id}/block/`, {
-          method: 'PATCH',
-        });
+        await fetchJson(`/api/apartments/${selectedApartment.id}/block/`, { method: 'PATCH' });
         const updated = await fetchJson(`/api/apartments/${selectedApartment.id}/`);
         setSelectedApartment(updated);
       }
-
-      // обновим список
-      const params = new URLSearchParams();
-      if (entrance !== 'all') params.set('entrance', entrance);
-      if (debouncedQuery) params.set('search', debouncedQuery);
-      const refreshed = await fetchJson(`/api/apartments?${params.toString()}`);
-      const list = Array.isArray(refreshed) ? refreshed : (refreshed.results || []);
-      setApartments(list);
+      await reloadList();
     } catch (e) {
       alert('Не имеете прав для этого действия');
     }
   };
 
-  // подпись для статуса
+  // принять / отклонить квартиру (меняет approval_status у профилей жильцов этой квартиры)
+  const acceptApartment = async (reject = false) => {
+    if (!selectedApartment) return;
+    try {
+      const url = `/api/apartments/${selectedApartment.id}/${reject ? 'reject' : 'accept'}/`;
+      const res = await fetchJson(url, { method: 'PATCH' });
+      // Можно показать уведомление:
+      // alert(`Обновлено профилей: ${res.updated_profiles}. Статус: ${res.approval_status}`);
+      await reloadList();
+    } catch (e) {
+      alert(e?.message || 'Не удалось обновить статус одобрения');
+    }
+  };
+
+  // подпись для статуса блокировки
   const statusLabel = useMemo(() => {
     if (!selectedApartment) return '';
     const blocked = selectedApartment.is_blocked ?? (selectedApartment.status === 'Заблокирована');
@@ -141,20 +148,23 @@ const Admin = () => {
         placeholder="Номер квартиры"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        className={c.search}
       />
 
-      {/* Фильтр по подъезду/блоку */}
+      {/* Фильтр по подъезду */}
       <select
         value={entrance}
         onChange={(e) => setEntrance(e.target.value)}
+        className={c.select}
       >
-        <option value="all">Все блоки</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        {/* при необходимости добавь 3,4 ... */}
+        <option value="all">Все подъезды</option>
+        <option value="1">1</option><option value="2">2</option>
+        <option value="3">3</option><option value="4">4</option>
+        <option value="5">5</option><option value="6">6</option>
+        <option value="7">7</option><option value="8">8</option>
       </select>
 
-      <h2>Блок: {entrance === 'all' ? 'Все' : entrance}</h2>
+      <h2>Подъезд: {entrance === 'all' ? 'Все' : entrance}</h2>
 
       {/* Список/состояния */}
       {loading && <div className={c.loading}>Загрузка…</div>}
@@ -162,7 +172,7 @@ const Admin = () => {
 
       <div className={c.apartments}>
         {!loading && !err && apartments.map((ap) => (
-          <button key={ap.id} onClick={() => openApartment(ap)}>
+          <button key={ap.id} onClick={() => openApartment(ap)} className={c.apartmentBtn}>
             {ap.number}{ap.is_blocked ? ' 🔒' : ''}
           </button>
         ))}
@@ -178,6 +188,15 @@ const Admin = () => {
             <h3>Квартира №{selectedApartment.number}</h3>
             <p><b>Владелец:</b> {selectedApartment.owner_name || '—'}</p>
             <p><b>Статус:</b> {statusLabel}</p>
+
+            <div className={c.rowActions}>
+              <button className={c.primary} onClick={() => acceptApartment(false)}>
+                Принять квартиру
+              </button>
+              <button className={c.secondary} onClick={() => acceptApartment(true)}>
+                Отклонить
+              </button>
+            </div>
 
             <button className={c.blockBtn} onClick={toggleBlock}>
               {statusLabel === 'Активна' ? 'Заблокировать' : 'Разблокировать'}

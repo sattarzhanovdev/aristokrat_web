@@ -7,6 +7,7 @@ import './App.scss';
 import { tryRefreshAccessToken, getMe, getResidentProfileMe, fetchJson } from './api';
 import { clearTokens } from './api/axios';
 import axios from 'axios';
+// axios.defaults.baseURL = 'https://aristokratamanat.pythonanywhere.com';
 
 // универсальная проверка флага "активен"
 function isActiveResidentFlag(p) {
@@ -82,7 +83,7 @@ export default function App() {
 
       // профиль — если явно «не активен», тогда выкидываем
       try {
-        const prof = await getResidentProfileMe();
+        const prof = await fetchJson("/api/profile/me");
         if (!isActiveResidentFlag(prof)) {
           clearTokens();
           if (mountedRef.current && !canceled) {
