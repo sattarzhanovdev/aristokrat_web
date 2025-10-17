@@ -199,8 +199,13 @@ export const changePassword = async (oldPassword, newPassword) => {
 
 // утилиты, если вдруг нужны где-то ещё
 export const getIsAdmin = async () => {
-  const { data } = await api.get("/api/profile/me/");
-  return !!data?.is_admin;
+  const { data } = await api.get("/api/auth/me/");
+  return Boolean(
+    data?.adminFlag ??
+    data?.is_admin ??
+    data?.is_staff ??
+    data?.is_superuser
+  );
 };
 export const getResidentEntranceNo = async () => {
   const { data } = await api.get("/api/profile/me/");
