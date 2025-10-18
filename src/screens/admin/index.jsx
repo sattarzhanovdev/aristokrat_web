@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import c from './admin.module.scss';
 import { useNavigate } from 'react-router-dom';
 import { BiArrowBack } from 'react-icons/bi';
-import { fetchJson } from '../../api';
+import api, { fetchJson } from '../../api';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const Admin = () => {
       try {
         const me = await fetchJson('/api/auth/me');
         const isSuper = Boolean(me.is_superuser);
-        const isStaff = Boolean(me.is_staff);
+        const isStaff = Boolean(me.adminFlag);
         if (!isSuper && !isStaff) {
           navigate('/', { replace: true });
           return;
@@ -37,6 +37,11 @@ const Admin = () => {
   const [query, setQuery] = useState('');            // поиск
   const [selectedApartment, setSelectedApartment] = useState(null);
 
+  // React.useEffect(() => {
+  //   fetchJson('/api/apartments/').then(data => {
+  //     console.log(data.results);
+  //   })
+  // }, []);
   // === data state ===
   const [apartments, setApartments] = useState([]);
   const [loading, setLoading] = useState(false);
