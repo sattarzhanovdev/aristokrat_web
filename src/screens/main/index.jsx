@@ -6,20 +6,18 @@ import {
   getIsAdmin,
   getPasswordStatus,
   changePassword,
-  getApprovalStatus, // <--- НОВОЕ
+  getApprovalStatus,
+  fetchJson, // /api/auth/me и /api/profile/me
 } from "../../api";
 import logo from "../../images/logo.svg";
 
 /* ================= Firebase RTDB Streaming (SSE) ================= */
 const DB_URL =
   "https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app";
-const ID_TOKEN = null; // если правила закрыты — положи сюда JWT
+const ID_TOKEN = null;
 const authQ = ID_TOKEN ? `?auth=${encodeURIComponent(ID_TOKEN)}` : "";
-
-// REST endpoints
 const toUrl = (path) => `${DB_URL}${path}.json${authQ}`;
 
-// обычная запись (импульс)
 const rtdbSetBoolean = async (path, value) => {
   const res = await fetch(toUrl(path), {
     method: "PUT",
@@ -32,7 +30,6 @@ const rtdbSetBoolean = async (path, value) => {
   }
 };
 
-// нормализация значений в boolean
 const toBool = (x) => {
   if (x === true || x === false) return x;
   if (x === 1 || x === 0) return !!x;
@@ -44,26 +41,19 @@ const toBool = (x) => {
   return false;
 };
 
-// подписка на события put/patch по данному пути
 const subscribeStream = (path, onChange) => {
-  // EventSource не принимает заголовки, поэтому auth — в query (?auth=..)
   const es = new EventSource(toUrl(path));
   const handler = (ev) => {
     try {
-      const payload = JSON.parse(ev.data); // { path, data } или { path, data: {..} }
+      const payload = JSON.parse(ev.data);
       onChange(payload);
-    } catch (_) {
-      // ignore malformed chunks
-    }
+    } catch (_) {}
   };
   es.addEventListener("put", handler);
   es.addEventListener("patch", handler);
-  es.onerror = () => {
-    // браузер сам переподключится
-  };
+  es.onerror = () => {};
   return () => es.close();
 };
-/* ================================================================= */
 
 const startPolling = (path, onChange, interval = 2000) => {
   let timer;
@@ -107,19 +97,7 @@ const pathFor = (key, entranceNo) => {
 
 const keyId = (key, enNo = null) => `${key}-${enNo ?? "global"}`;
 
-// преобразуем снэпшот entrances -> плоская карта {'door-1': true/false, ...}
-const flattenEntrances = (dataObj) => {
-  const out = {};
-  if (!dataObj || typeof dataObj !== "object") return out;
-  Object.keys(dataObj).forEach((no) => {
-    const e = dataObj[no] || {};
-    out[keyId("door", no)] = toBool(e.door?.value);
-    out[keyId("liftPass", no)] = toBool(e.lift_pass?.value);
-    out[keyId("liftGruz", no)] = toBool(e.lift_gruz?.value);
-  });
-  return out;
-};
-
+/* =================== Формы =================== */
 function PasswordChangeForm({ busy, error, onSubmit }) {
   const [oldPwd, setOldPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -182,6 +160,63 @@ function PasswordChangeForm({ busy, error, onSubmit }) {
   );
 }
 
+function ProfileUpdateForm({ busy, error, initial, onSubmit }) {
+  const [firstName, setFirstName] = useState(initial?.firstName || "");
+  const [phone, setPhone] = useState(initial?.phone || "");
+
+  const normalizedPhone = (p) => p.replace(/[^\d+]/g, "");
+
+  useEffect(() => {
+    setFirstName(initial?.firstName || "");
+    setPhone(initial?.phone || "");
+  }, [initial]);
+
+  return (
+    <form
+      className={c.pwdForm}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fn = firstName.trim();
+        const ph = normalizedPhone(phone).trim();
+        onSubmit(fn, ph);
+      }}
+    >
+      <label>
+        Имя
+        <input
+          type="text"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          disabled={busy}
+          required
+        />
+      </label>
+
+      <label>
+        Телефон
+        <input
+          type="tel"
+          inputMode="tel"
+          placeholder="+996XXXXXXXXX"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          disabled={busy}
+          required
+        />
+      </label>
+
+      {error && <div className={c.errorInline}>{error}</div>}
+
+      <div className={c.modalActions}>
+        <button type="submit" disabled={busy}>
+          {busy ? "Сохраняем..." : "Сохранить"}
+        </button>
+      </div>
+    </form>
+  );
+}
+/* ============================================ */
+
 export default function Main() {
   const [entranceNo, setEntranceNo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -196,32 +231,38 @@ export default function Main() {
   const [pwdBusy, setPwdBusy] = useState(false);
   const [pwdErr, setPwdErr] = useState("");
 
+  // принудительное обновление профиля (имя + телефон)
+  const [mustUpdateProfile, setMustUpdateProfile] = useState(false);
+  const [profBusy, setProfBusy] = useState(false);
+  const [profErr, setProfErr] = useState("");
+  const [profileInitial, setProfileInitial] = useState({
+    firstName: "",
+    phone: "",
+  });
+
   // локальные “импульсы” и временная блокировка
   const [active, setActive] = useState({});
   const [busy, setBusy] = useState({});
+  const [remoteOn, setRemoteOn] = useState({});
 
-  // серверные статусы: если true — кнопку дизэйблим
-  const [remoteOn, setRemoteOn] = useState({}); // { 'door-3': true, 'kalitka1-global': false, ... }
-
-  // роль + подъезд + статус одобрения + статус пароля
+  // роль + подъезд + статусы
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
+
         const [adminFlag, no, approval, pwd] = await Promise.all([
           getIsAdmin(),
           getResidentEntranceNo().catch(() => null),
-          getApprovalStatus(),   // ← {"status":"accepted"|"not_accepted"}
-          getPasswordStatus(),   // ← {"status":"updated"|"not_updated"}
+          getApprovalStatus().catch(() => ({ status: "accepted" })), // фолбэк
+          getPasswordStatus().catch(() => ({ status: "updated" })), // фолбэк
         ]);
 
-        // проверка одобрения
+        // 1) одобрение
         if (approval?.status !== "accepted") {
           setIsApproved(false);
           alert("Ваш аккаунт еще не одобрен");
-          // можно здесь же сделать редирект, если нужно:
-          // window.location.href = "/logout";
-          return; // дальше не грузим UI
+          return;
         } else {
           setIsApproved(true);
         }
@@ -233,20 +274,94 @@ export default function Main() {
           setErr("В профиле нет номера подъезда. Обратитесь к администратору.");
         }
 
+        // 2) пароль
         if (pwd?.status === "not_updated") {
-          setMustChangePwd(true); // откроется модалка
+          setMustChangePwd(true);
+          return; // пароль первым делом
         }
+
+        // 3) профиль (имя + телефон)
+        await checkProfileNeed();
       } catch (e) {
         setErr(e?.message || "Не удалось получить данные профиля");
       } finally {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // после закрытия модалки пароля — проверяем профиль
+  useEffect(() => {
+    if (!mustChangePwd && isApproved) {
+      checkProfileNeed().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mustChangePwd, isApproved]);
+
+  // Проверка необходимости модалки профиля
+  const checkProfileNeed = async () => {
+    const [me, prof] = await Promise.all([
+      fetchJson("/api/auth/me"),
+      fetchJson("/api/profile/me").catch(() => ({})),
+    ]);
+
+    const firstName = String(me?.first_name || "").trim();
+    const lastName = String(me?.last_name || "").trim();
+    const userName = String(me?.username || "").trim();
+    const profName = String(prof?.name || "").trim(); // если есть такое поле в профиле
+    const phone = String(prof?.phone || me?.phone || "").trim();
+
+    const phoneClean = phone.replace(/[^\d+]/g, "");
+    const phoneValid =
+      /^\+996\d{9}$/.test(phoneClean) || /^\+?\d{7,15}$/.test(phoneClean);
+
+    // что подставить в инпут имени, если он пуст
+    const initialName = firstName || lastName || profName || userName;
+    setProfileInitial({ firstName: initialName, phone });
+
+    // имя считаем "есть", если есть что-то из: first_name/last_name/prof.name/username
+    const hasAnyName = Boolean(initialName);
+    const need = !hasAnyName || !phoneValid;
+
+    setMustUpdateProfile(need);
+    return !need; // true = всё ок, модалка не нужна
+  };
+
+  const saveProfile = async (firstName, phone) => {
+    setProfErr("");
+
+    const phoneClean = phone.replace(/[^\d+]/g, "");
+    if (!firstName) {
+      setProfErr("Введите имя.");
+      return;
+    }
+    if (!(/^\+996\d{9}$/.test(phoneClean) || /^\+?\d{7,15}$/.test(phoneClean))) {
+      setProfErr("Введите корректный номер телефона.");
+      return;
+    }
+
+    try {
+      setProfBusy(true);
+      // кладём введённое имя в first_name (можешь поменять на last_name или name)
+      await fetchJson("/api/profile/me", {
+        method: "PATCH",
+        body: { first_name: firstName, phone: phoneClean },
+      });
+
+      // после сохранения повторно проверяем — если всё ок, закрываем модалку
+      const ok = await checkProfileNeed();
+      if (ok) setMustUpdateProfile(false);
+    } catch (e) {
+      setProfErr(e?.message || "Не удалось сохранить профиль");
+    } finally {
+      setProfBusy(false);
+    }
+  };
 
   /* ---------- STREAM: подписки на RTDB, без опросов ---------- */
   useEffect(() => {
-    if (!isApproved) return; // не подписываемся, если не одобрен
+    if (!isApproved) return;
     const onEntrancesChange = ({ data, path }) => {
       if (!data) return;
 
@@ -314,7 +429,6 @@ export default function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isApproved]);
 
-  // 2) Глобальные узлы: калитки и паркинг — отдельные стримы
   useEffect(() => {
     if (!isApproved) return;
     const stops = ["kalitka1", "kalitka2", "kalitka3", "kalitka4", "parking"].map(
@@ -329,9 +443,7 @@ export default function Main() {
     );
     return () => stops.forEach((stop) => stop && stop());
   }, [isApproved]);
-  /* ------------------------------------------------------------- */
 
-  // анти-залипание: когда сервер сказал false — снимаем локальный busy
   useEffect(() => {
     const next = { ...busy };
     let changed = false;
@@ -345,7 +457,6 @@ export default function Main() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteOn]);
 
-  // отправка импульса: true -> 1s -> false
   const pulse = async (key, enNo = null) => {
     if (!isApproved) return;
     const targetEntrance = enNo ?? entranceNo;
@@ -357,16 +468,14 @@ export default function Main() {
     if (!dbPath) return;
 
     const id = keyId(key, targetEntrance);
-    if (busy[id] || remoteOn[id] === true) return; // сервер держит true — не жмём
+    if (busy[id] || remoteOn[id] === true) return;
 
     setBusy((s) => ({ ...s, [id]: true }));
     setActive((s) => ({ ...s, [id]: true }));
 
     try {
       await rtdbSetBoolean(dbPath, true);
-    } catch {
-      // можно показать тост
-    }
+    } catch {}
 
     setTimeout(async () => {
       try {
@@ -383,7 +492,7 @@ export default function Main() {
     return !!busy[id] || remoteOn[id] === true;
   };
 
-  // Если аккаунт не одобрен — показываем простое сообщение (UI заблокирован)
+  // Заблокированный UI при не-одобренном аккаунте
   if (!isApproved) {
     return (
       <div className={c.main}>
@@ -399,16 +508,14 @@ export default function Main() {
 
   return (
     <div className={c.main}>
-      {/* Модалка принудительной смены пароля */}
+      {/* Модалка смены пароля */}
       {mustChangePwd && (
         <div className={c.modalBackdrop}>
           <div className={c.modal}>
             <h3>Смена пароля</h3>
             <p className={c.modalDesc}>
-              По требованиям безопасности вам нужно обновить пароль, чтобы
-              продолжить.
+              По требованиям безопасности вам нужно обновить пароль, чтобы продолжить.
             </p>
-
             <PasswordChangeForm
               busy={pwdBusy}
               error={pwdErr}
@@ -425,7 +532,7 @@ export default function Main() {
                 try {
                   setPwdBusy(true);
                   await changePassword(oldPwd, newPwd);
-                  setMustChangePwd(false); // разблокируем UI
+                  setMustChangePwd(false);
                 } catch (e) {
                   setPwdErr(e?.message || "Ошибка при смене пароля");
                 } finally {
@@ -437,12 +544,30 @@ export default function Main() {
         </div>
       )}
 
+      {/* Модалка обновления профиля (имя + телефон) */}
+      {!mustChangePwd && mustUpdateProfile && (
+        <div className={c.modalBackdrop}>
+          <div className={c.modal}>
+            <h3>Заполните профиль</h3>
+            <p className={c.modalDesc}>
+              Укажите имя и номер телефона, чтобы продолжить использование.
+            </p>
+            <ProfileUpdateForm
+              busy={profBusy}
+              error={profErr}
+              initial={profileInitial}
+              onSubmit={saveProfile}
+            />
+          </div>
+        </div>
+      )}
+
       <div className={c.logo}>
         <img src={logo} alt="logo" />
       </div>
       {err && <div className={c.error}>{err}</div>}
 
-      {/* Админ: все подъезды */}
+      {/* Админский UI */}
       {!loading && isAdmin && (
         <>
           <h3 className={c.section}>Подъезды (админ)</h3>
@@ -455,11 +580,7 @@ export default function Main() {
                     className={cls("door", no)}
                     disabled={dis("door", no)}
                     onClick={() => pulse("door", no)}
-                    title={
-                      remoteOn[keyId("door", no)]
-                        ? "Недоступно: value=true"
-                        : ""
-                    }
+                    title={toBool(remoteOn[keyId("door", no)]) ? "Недоступно: value=true" : ""}
                   >
                     Дверь
                   </button>
@@ -468,11 +589,7 @@ export default function Main() {
                       className={cls("liftPass", no)}
                       disabled={dis("liftPass", no)}
                       onClick={() => pulse("liftPass", no)}
-                      title={
-                        remoteOn[keyId("liftPass", no)]
-                          ? "Недоступно: value=true"
-                          : ""
-                      }
+                      title={toBool(remoteOn[keyId("liftPass", no)]) ? "Недоступно: value=true" : ""}
                     >
                       Лифт (пасс.)
                     </button>
@@ -480,11 +597,7 @@ export default function Main() {
                       className={cls("liftGruz", no)}
                       disabled={dis("liftGruz", no)}
                       onClick={() => pulse("liftGruz", no)}
-                      title={
-                        remoteOn[keyId("liftGruz", no)]
-                          ? "Недоступно: value=true"
-                          : ""
-                      }
+                      title={toBool(remoteOn[keyId("liftGruz", no)]) ? "Недоступно: value=true" : ""}
                     >
                       Лифт (груз.)
                     </button>
@@ -496,7 +609,7 @@ export default function Main() {
         </>
       )}
 
-      {/* Обычный пользователь: только свой подъезд */}
+      {/* Пользовательский UI */}
       {!loading && !isAdmin && entranceNo && (
         <>
           <button
@@ -504,7 +617,7 @@ export default function Main() {
             disabled={dis("door", entranceNo)}
             onClick={() => pulse("door", entranceNo)}
             title={
-              remoteOn[keyId("door", entranceNo)]
+              toBool(remoteOn[keyId("door", entranceNo)])
                 ? "Недоступно: value=true"
                 : `Подъезд ${entranceNo}`
             }
@@ -517,11 +630,7 @@ export default function Main() {
               className={cls("liftPass", entranceNo)}
               disabled={dis("liftPass", entranceNo)}
               onClick={() => pulse("liftPass", entranceNo)}
-              title={
-                remoteOn[keyId("liftPass", entranceNo)]
-                  ? "Недоступно: value=true"
-                  : ""
-              }
+              title={toBool(remoteOn[keyId("liftPass", entranceNo)]) ? "Недоступно: value=true" : ""}
             >
               Лифт (пассажир)
             </button>
@@ -529,11 +638,7 @@ export default function Main() {
               className={cls("liftGruz", entranceNo)}
               disabled={dis("liftGruz", entranceNo)}
               onClick={() => pulse("liftGruz", entranceNo)}
-              title={
-                remoteOn[keyId("liftGruz", entranceNo)]
-                  ? "Недоступно: value=true"
-                  : ""
-              }
+              title={toBool(remoteOn[keyId("liftGruz", entranceNo)]) ? "Недоступно: value=true" : ""}
             >
               Лифт (грузовой)
             </button>
@@ -545,53 +650,30 @@ export default function Main() {
       {!loading && (
         <>
           <div className={c.doors}>
-            <button
-              className={cls("kalitka1")}
-              disabled={dis("kalitka1")}
-              onClick={() => pulse("kalitka1")}
-              title={
-                remoteOn[keyId("kalitka1")] ? "Недоступно: value=true" : ""
-              }
-            >
-              Калитка №1
-            </button>
-            <button
-              className={cls("kalitka2")}
-              disabled={dis("kalitka2")}
-              onClick={() => pulse("kalitka2")}
-              title={
-                remoteOn[keyId("kalitka2")] ? "Недоступно: value=true" : ""
-              }
-            >
-              Калитка №2
-            </button>
-            <button
-              className={cls("kalitka3")}
-              disabled={dis("kalitka3")}
-              onClick={() => pulse("kalitka3")}
-              title={
-                remoteOn[keyId("kalitka3")] ? "Недоступно: value=true" : ""
-              }
-            >
-              Калитка №3
-            </button>
-            <button
-              className={cls("kalitka4")}
-              disabled={dis("kalitka4")}
-              onClick={() => pulse("kalitka4")}
-              title={
-                remoteOn[keyId("kalitka4")] ? "Недоступно: value=true" : ""
-              }
-            >
-              Калитка №4
-            </button>
+            {["kalitka1", "kalitka2", "kalitka3", "kalitka4"].map((k) => (
+              <button
+                key={k}
+                className={cls(k)}
+                disabled={dis(k)}
+                onClick={() => pulse(k)}
+                title={toBool(remoteOn[keyId(k)]) ? "Недоступно: value=true" : ""}
+              >
+                {k === "kalitka1"
+                  ? "Калитка №1"
+                  : k === "kalitka2"
+                  ? "Калитка №2"
+                  : k === "kalitka3"
+                  ? "Калитка №3"
+                  : "Калитка №4"}
+              </button>
+            ))}
           </div>
 
           <button
             className={cls("parking")}
             disabled={dis("parking")}
             onClick={() => pulse("parking")}
-            title={remoteOn[keyId("parking")] ? "Недоступно: value=true" : ""}
+            title={toBool(remoteOn[keyId("parking")]) ? "Недоступно: value=true" : ""}
           >
             Паркинг
           </button>
