@@ -187,6 +187,7 @@ const Admin = () => {
           <div className={c.popup} onClick={(e) => e.stopPropagation()}>
             <h3>Квартира №{selectedApartment.number}</h3>
             <p><b>Владелец:</b> {selectedApartment.owner_name || '—'}</p>
+            <p><b>Номер телефона:</b> {selectedApartment.phone}</p>
             <p><b>Статус:</b> {statusLabel}</p>
 
             <div className={c.rowActions}>
