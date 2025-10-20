@@ -109,7 +109,7 @@ export default function Login() {
 
         <form className={c.form} onSubmit={onSubmit} noValidate>
           <label className={c.label}>
-            Номер квартиры (или email/телефон)
+            Номер квартиры - подъезд
             <input
               className={`${c.input} ${login && !validLogin ? c.error : ''}`}
               type="text"
