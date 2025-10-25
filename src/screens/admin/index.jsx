@@ -7,6 +7,8 @@ import api, { fetchJson } from '../../api';
 
 const Admin = () => {
   const navigate = useNavigate();
+  const [ buttonClicked, setButtonClicked ] = React.useState(false)
+  const [ buttonClicked2, setButtonClicked2 ] = React.useState(false)
 
   // === ГАРД ДОСТУПА ===
   const [authChecked, setAuthChecked] = useState(false);
@@ -64,6 +66,13 @@ const Admin = () => {
     const list = Array.isArray(data) ? data : (data.results || []);
     setApartments(list);
   };
+
+  useEffect(() => {
+    setTimeout(() => {
+      setButtonClicked(false)
+      setButtonClicked2(false)
+    }, 1000)
+  }, [buttonClicked, buttonClicked2])
 
   useEffect(() => {
     if (!authChecked) return; // ждём проверку доступа
@@ -196,10 +205,16 @@ const Admin = () => {
             <p><b>Статус:</b> {statusLabel}</p>
 
             <div className={c.rowActions}>
-              <button className={c.primary} onClick={() => acceptApartment(false)}>
+              <button className={c.primary} style={buttonClicked ? {background: '#003b00'} : null} onClick={() => {
+                acceptApartment(false)
+                setButtonClicked(true)
+              }}>
                 Принять квартиру
               </button>
-              <button className={c.secondary} onClick={() => acceptApartment(true)}>
+              <button className={c.secondary} style={buttonClicked2 ? {background: '#a20000'} : null} onClick={() => {
+                acceptApartment(true)
+                setButtonClicked2(true)
+              }}>
                 Отклонить
               </button>
             </div>

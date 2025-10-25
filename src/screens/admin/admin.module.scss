@@ -25,6 +25,25 @@
   }
 }
 
+.primary{
+  width: 50%;
+  height: 40px;
+  background: green;
+  border: 0;
+  border-radius: 6px;
+  color: white;
+  margin-right: 6px;
+}
+
+.secondary{
+  width: 40%;
+  height: 40px;
+  background: red;
+  border: 0;
+  border-radius: 6px;
+  color: white;
+}
+
 input{
   width: 93%;
   max-width: 400px;
