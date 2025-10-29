@@ -578,7 +578,6 @@ export default function Main() {
                 <div className={c.entranceButtons}>
                   <button
                     className={cls("door", no)}
-                    disabled={dis("door", no)}
                     onClick={() => pulse("door", no)}
                     title={toBool(remoteOn[keyId("door", no)]) ? "Недоступно: value=true" : ""}
                   >
@@ -587,7 +586,6 @@ export default function Main() {
                   <div className={c.row}>
                     <button
                       className={cls("liftPass", no)}
-                      disabled={dis("liftPass", no)}
                       onClick={() => pulse("liftPass", no)}
                       title={toBool(remoteOn[keyId("liftPass", no)]) ? "Недоступно: value=true" : ""}
                     >
@@ -595,7 +593,6 @@ export default function Main() {
                     </button>
                     <button
                       className={cls("liftGruz", no)}
-                      disabled={dis("liftGruz", no)}
                       onClick={() => pulse("liftGruz", no)}
                       title={toBool(remoteOn[keyId("liftGruz", no)]) ? "Недоступно: value=true" : ""}
                     >
@@ -614,7 +611,6 @@ export default function Main() {
         <>
           <button
             className={cls("door", entranceNo)}
-            disabled={dis("door", entranceNo)}
             onClick={() => pulse("door", entranceNo)}
             title={
               toBool(remoteOn[keyId("door", entranceNo)])
@@ -628,7 +624,6 @@ export default function Main() {
           <div className={c.elevators}>
             <button
               className={cls("liftPass", entranceNo)}
-              disabled={dis("liftPass", entranceNo)}
               onClick={() => pulse("liftPass", entranceNo)}
               title={toBool(remoteOn[keyId("liftPass", entranceNo)]) ? "Недоступно: value=true" : ""}
             >
@@ -636,7 +631,6 @@ export default function Main() {
             </button>
             <button
               className={cls("liftGruz", entranceNo)}
-              disabled={dis("liftGruz", entranceNo)}
               onClick={() => pulse("liftGruz", entranceNo)}
               title={toBool(remoteOn[keyId("liftGruz", entranceNo)]) ? "Недоступно: value=true" : ""}
             >
@@ -654,7 +648,6 @@ export default function Main() {
               <button
                 key={k}
                 className={cls(k)}
-                disabled={dis(k)}
                 onClick={() => pulse(k)}
                 title={toBool(remoteOn[keyId(k)]) ? "Недоступно: value=true" : ""}
               >
@@ -671,7 +664,6 @@ export default function Main() {
 
           <button
             className={cls("parking")}
-            disabled={dis("parking")}
             onClick={() => pulse("parking")}
             title={toBool(remoteOn[keyId("parking")]) ? "Недоступно: value=true" : ""}
           >
