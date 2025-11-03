@@ -115,6 +115,29 @@ export default function App() {
           })
       })
     }
+    (async () => {
+      // если приватная страница и есть refresh — тихо обновим access заранее
+      const hasRefresh =
+        localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+
+      if (hasRefresh) {
+        await tryInitialRefresh(); // не важно, был access или нет
+      }
+
+      // далее как у тебя: getMe -> профиль -> проверки
+      try {
+        await getMe();
+        // ...
+      } catch (e) {
+        const status = e?.response?.status ?? e?.status;
+        if (status === 401 || status === 403) {
+          clearTokens();
+          navigate('/login', { replace: true });
+          return;
+        }
+      }
+      // ...
+    })();
   }, [pathname]);
 
   // Можно показать лёгкий лоадер, но НЕ возвращать null надолго
