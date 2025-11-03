@@ -5,7 +5,7 @@ import { MainRoutes } from './routes';
 import { Components } from './components';
 import './App.scss';
 import { tryRefreshAccessToken, getMe, getResidentProfileMe, fetchJson } from './api';
-import { clearTokens } from './api/axios';
+import { clearTokens, tryInitialRefresh } from './api/axios';
 import axios from 'axios';
 // axios.defaults.baseURL = 'https://aristokratamanat.pythonanywhere.com';
 
