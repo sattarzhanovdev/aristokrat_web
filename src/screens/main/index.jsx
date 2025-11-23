@@ -10,6 +10,7 @@ import {
   fetchJson, // /api/auth/me и /api/profile/me
 } from "../../api";
 import logo from "../../images/logo.svg";
+import axios from "axios";
 
 /* ================= Firebase RTDB Streaming (SSE) ================= */
 const DB_URL =
@@ -662,15 +663,32 @@ export default function Main() {
             ))}
           </div>
 
-          <button
-            className={cls("parking")}
-            onClick={() => pulse("parking")}
-            title={toBool(remoteOn[keyId("parking")]) ? "Недоступно: value=true" : ""}
-          >
-            Паркинг
-          </button>
+          {
+            isAdmin ?
+            <>
+              <button
+                className={cls("parking")}
+                onClick={() => {
+                  axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/shlagbaum.json", true);
+                }}
+              >
+                Шлагбаум
+              </button>
+              <button
+                className={cls("parking")}
+                onClick={() => {
+                  axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/value.json", true);
+                }}
+              >
+                Паркинг
+              </button>
+            </>
+             :
+            null
+          }
         </>
       )}
+
     </div>
   );
 }
