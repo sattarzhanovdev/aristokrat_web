@@ -241,6 +241,7 @@ export default function Main() {
     phone: "",
   });
 
+  const apartment = JSON.parse(localStorage.getItem('user'))?.apartment_no
   // локальные “импульсы” и временная блокировка
   const [active, setActive] = useState({});
   const [busy, setBusy] = useState({});
@@ -669,7 +670,7 @@ export default function Main() {
           </div>
 
           {
-            isAdmin ?
+            isAdmin || apartment === 175 ?
             <>
               <button
                 className={cls("parking")}

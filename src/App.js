@@ -109,8 +109,6 @@ export default function App() {
     }
   }, []);
 
-  const apartment = JSON.parse(localStorage.getItem('user')).apartment_no
-
 
   React.useEffect(() => {
     if(localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken')){
