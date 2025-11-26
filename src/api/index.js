@@ -170,6 +170,7 @@ export const getMe = async () => {
   // если бэк возвращает ещё и refresh — сохраним (редко, но вдруг)
   if (data?.access) setAccess(data.access);
   if (data?.refresh) setRefresh(data.refresh);
+  localStorage.setItem('user', JSON.stringify(data))
   return data;
 };
 

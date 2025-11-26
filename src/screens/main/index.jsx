@@ -352,6 +352,8 @@ export default function Main() {
 
       // после сохранения повторно проверяем — если всё ок, закрываем модалку
       const ok = await checkProfileNeed();
+      console.log()
+
       if (ok) setMustUpdateProfile(false);
     } catch (e) {
       setProfErr(e?.message || "Не удалось сохранить профиль");
@@ -507,6 +509,7 @@ export default function Main() {
     );
   }
 
+
   return (
     <div className={c.main}>
       {/* Модалка смены пароля */}
@@ -566,6 +569,8 @@ export default function Main() {
       <div className={c.logo}>
         <img src={logo} alt="logo" />
       </div>
+
+      <button className={c.door} onClick={() => window.location.reload()}>Обновить</button>
       {err && <div className={c.error}>{err}</div>}
 
       {/* Админский UI */}
@@ -670,6 +675,9 @@ export default function Main() {
                 className={cls("parking")}
                 onClick={() => {
                   axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/shlagbaum.json", true);
+                  setTimeout(() => {
+                    axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/shlagbaum.json", JSON.stringify(false));
+                  }, 1000)
                 }}
               >
                 Шлагбаум
@@ -680,7 +688,15 @@ export default function Main() {
                   axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/value.json", true);
                 }}
               >
-                Паркинг
+                Паркинг1
+              </button>
+              <button
+                className={cls("parking")}
+                onClick={() => {
+                  axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota2/value.json", true);
+                }}
+              >
+                Паркинг2
               </button>
             </>
              :

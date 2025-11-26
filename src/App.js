@@ -97,10 +97,22 @@ export default function App() {
     })();
 
     return () => { canceled = true; unmark(); };
-  }, [pathname, navigate]);
+  }, [pathname]);
 
   React.useEffect(() => {
-    window.location.reload()
+    // localStorage.setItem("hasReloaded", false);
+    const hasReloaded = localStorage.getItem("hasReloaded");
+
+    if (!hasReloaded) {
+      localStorage.setItem("hasReloaded", "true");
+      window.location.reload();
+    }
+  }, []);
+
+  const apartment = JSON.parse(localStorage.getItem('user')).apartment_no
+
+
+  React.useEffect(() => {
     if(localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken')){
       getResidentProfileMe()
       .then((prof) => {
