@@ -100,45 +100,75 @@ export default function App() {
   }, [pathname, navigate]);
 
   React.useEffect(() => {
-    if(localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken')){
-      getResidentProfileMe()
-      .then((prof) => {
-        fetchJson('/api/apartments')
-          .then((apts) => {
-            const apt = apts.results.find((a) => a.number === prof.username);
-            
-            if (apt && apt.is_blocked) {
-              clearTokens();
-              alert('Ваше жильё заблокировано. Пожалуйста, обратитесь к администратору.');
-              navigate('/login', { replace: true });
-            }
-          })
-      })
+  let canceled = false;
+
+  (async () => {
+    // публичные роуты
+    if (PUBLIC_PATHS.has(pathname)) {
+      if (!canceled) setReady(true);
+      return;
     }
-    (async () => {
-      // если приватная страница и есть refresh — тихо обновим access заранее
-      const hasRefresh =
-        localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
 
-      if (hasRefresh) {
-        await tryInitialRefresh(); // не важно, был access или нет
-      }
+    // нет токенов вообще — на /login
+    const hasAnyToken =
+      localStorage.getItem('accessToken')  || sessionStorage.getItem('accessToken') ||
+      localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
 
-      // далее как у тебя: getMe -> профиль -> проверки
-      try {
-        await getMe();
-        // ...
-      } catch (e) {
-        const status = e?.response?.status ?? e?.status;
-        if (status === 401 || status === 403) {
-          clearTokens();
-          navigate('/login', { replace: true });
-          return;
-        }
+    if (!hasAnyToken) {
+      if (!canceled) {
+        setReady(true);
+        navigate('/login', { replace: true });
       }
-      // ...
-    })();
-  }, [pathname]);
+      return;
+    }
+
+    // UI не держим пустым
+    if (!canceled) setReady(true);
+
+    // сначала один раз пробуем обновить access через refresh
+    await tryInitialRefresh().catch(() => false);
+
+    // проверяем /me
+    try {
+      await getMe();
+    } catch (e) {
+      const status = e?.response?.status ?? e?.status;
+      if (status === 401 || status === 403) {
+        clearTokens();
+        if (!canceled) navigate('/login', { replace: true });
+        return;
+      }
+    }
+
+    // проверка активного профиля
+    try {
+      const prof = await fetchJson('/api/profile/me');
+      if (!isActiveResidentFlag(prof)) {
+        clearTokens();
+        if (!canceled) navigate('/login', { replace: true });
+      }
+    } catch {
+      // падаем — но не выкидываем
+    }
+
+    // проверка заблокированного жилья
+    try {
+      const prof = await getResidentProfileMe();
+      const apts = await fetchJson('/api/apartments');
+      const apt = apts.results.find((a) => a.number === prof.username);
+      if (apt && apt.is_blocked) {
+        clearTokens();
+        alert('Ваше жильё заблокировано. Пожалуйста, обратитесь к администратору.');
+        if (!canceled) navigate('/login', { replace: true });
+      }
+    } catch {
+      // тоже не критично
+    }
+  })();
+
+  return () => { canceled = true; };
+}, [pathname, navigate]);
+
 
   // Можно показать лёгкий лоадер, но НЕ возвращать null надолго
   if (!ready) return <div style={{height:'100vh'}} />;
