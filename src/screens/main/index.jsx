@@ -670,7 +670,7 @@ export default function Main() {
           </div>
 
           {
-            isAdmin || apartment === 175 ?
+            isAdmin || Number(apartment) === 175 ?
             <>
               <button
                 className={cls("parking")}
