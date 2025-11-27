@@ -98,7 +98,13 @@ const performRefresh = async () => {
   const { data } = await authClient.post('/api/auth/refresh', {
     refresh: rt,
     refreshToken: rt, // если бэку нужно так же
-  });
+  }).catch(e => {
+    if(e?.status === 401){
+      window.location.reload()
+    }
+    
+    
+  })
 
   // ОЖИДАЕМ такие имена. Если у тебя { access } или { access: '...' } — поменяй:
   const newAccess = data?.accessToken || data?.access;

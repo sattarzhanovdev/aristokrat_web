@@ -571,7 +571,7 @@ export default function Main() {
         <img src={logo} alt="logo" />
       </div>
 
-      <button className={c.door} onClick={() => window.location.reload()}>Обновить</button>
+      {/* <button className={c.door} onClick={() => window.location.reload()}>Обновить</button> */}
       {err && <div className={c.error}>{err}</div>}
 
       {/* Админский UI */}
