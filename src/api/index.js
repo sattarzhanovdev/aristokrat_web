@@ -88,6 +88,7 @@ api.interceptors.response.use(
           setAccess(data.access);
           queue.forEach((resume) => resume(data.access));
           queue = [];
+          window.location.reload()
         } catch (e) {
           queue = [];
           refreshing = false;

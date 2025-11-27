@@ -102,8 +102,6 @@ const performRefresh = async () => {
     if(e?.status === 401){
       window.location.reload()
     }
-    
-    
   })
 
   // ОЖИДАЕМ такие имена. Если у тебя { access } или { access: '...' } — поменяй:
