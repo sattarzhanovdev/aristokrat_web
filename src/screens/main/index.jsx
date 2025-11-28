@@ -687,6 +687,9 @@ export default function Main() {
                 className={cls("parking")}
                 onClick={() => {
                   axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/value.json", true);
+                  setTimeout(() => {
+                    axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota1/value.json", JSON.stringify(false));
+                  }, 1000)
                 }}
               >
                 Паркинг1
