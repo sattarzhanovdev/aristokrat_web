@@ -709,6 +709,22 @@ export default function Main() {
              :
             null
           }
+
+          {
+            Number(apartment) === 195 ?
+            <button
+              className={cls("parking")}
+              onClick={() => {
+                axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota2/value.json", true);
+                setTimeout(() => {
+                  axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota2/value.json", JSON.stringify(false));
+                }, 1000)
+              }}
+            >
+              Паркинг2
+            </button> : 
+            null
+          }
         </>
       )}
 
