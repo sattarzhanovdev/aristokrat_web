@@ -1,6 +1,8 @@
 // Main.jsx
 import React, { useEffect, useState } from "react";
 import c from "./main.module.scss";
+import parkingBase from './parking_list.json'
+
 import {
   getResidentEntranceNo,
   getIsAdmin,
@@ -242,6 +244,9 @@ export default function Main() {
   });
 
   const apartment = JSON.parse(localStorage.getItem('user'))?.apartment_no
+
+  const isParkingHave = parkingBase.find(item => item.apartment_number === apartment)
+  
   // локальные “импульсы” и временная блокировка
   const [active, setActive] = useState({});
   const [busy, setBusy] = useState({});
@@ -670,7 +675,7 @@ export default function Main() {
           </div>
 
           {
-            isAdmin || Number(apartment) === 175 ?
+            isAdmin || isParkingHave ?
             <>
               <button
                 className={cls("parking")}
@@ -707,22 +712,6 @@ export default function Main() {
               </button>
             </>
              :
-            null
-          }
-
-          {
-            Number(apartment) === 195 ?
-            <button
-              className={cls("parking")}
-              onClick={() => {
-                axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota2/value.json", true);
-                setTimeout(() => {
-                  axios.put("https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app/vorota2/value.json", JSON.stringify(false));
-                }, 1000)
-              }}
-            >
-              Паркинг2
-            </button> : 
             null
           }
         </>
