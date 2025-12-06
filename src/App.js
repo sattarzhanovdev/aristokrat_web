@@ -151,6 +151,12 @@ export default function App() {
     })();
   }, []);
 
+  React.useEffect(() => {
+    (async () => {
+      await tryInitialRefresh();
+    })();
+  }, []);
+
   // Можно показать лёгкий лоадер, но НЕ возвращать null надолго
   if (!ready) return <div style={{height:'100vh'}} />;
 

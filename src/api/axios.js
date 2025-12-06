@@ -93,19 +93,12 @@ const performRefresh = async () => {
   const rt = getRefresh();
   if (!rt) throw new Error('No refresh token');
 
-  // ПОДСТАВЬ под свой бекенд:
-  // Тело запроса и имена полей ответа
-  const { data } = await authClient.post('/api/auth/refresh', {
+  // ВАЖНО: endpoint с тем же слэшем, что и на бэке
+  const { data } = await authClient.post('/api/auth/refresh/', {
     refresh: rt,
-    refreshToken: rt, // если бэку нужно так же
-  }).catch(e => {
-    if(e?.status === 401){
-      window.location.reload()
-    }
-  })
+  });
 
-  // ОЖИДАЕМ такие имена. Если у тебя { access } или { access: '...' } — поменяй:
-  const newAccess = data?.accessToken || data?.access;
+  const newAccess  = data?.accessToken || data?.access;
   const newRefresh = data?.refreshToken || data?.refresh;
 
   if (!newAccess) throw new Error('No access token in refresh response');
@@ -122,15 +115,19 @@ api.interceptors.response.use(
     const status = response?.status;
     const original = config || {};
 
-    // Если это не 401 или уже ретраили — пробрасываем
+    // если не 401 или уже ретраили — выходим
     if (status !== 401 || original._retry) {
       return Promise.reject(error);
     }
 
-    // Помечаем, чтобы не зациклить
+    // нет refresh-токена → мы просто реально не авторизованы
+    if (!getRefresh()) {
+      clearTokens();
+      return Promise.reject(error);
+    }
+
     original._retry = true;
 
-    // Если уже идёт refresh — ждём его
     if (isRefreshing) {
       return new Promise((resolve, reject) => {
         subscribeTokenRefresh(async (newAccessToken) => {
@@ -148,22 +145,18 @@ api.interceptors.response.use(
       });
     }
 
-    // Иначе — запускаем refresh
     isRefreshing = true;
     try {
       const newAccessToken = await performRefresh();
 
-      // Разбудим очередь
       onRefreshed(newAccessToken);
 
-      // Повторим изначальный запрос
       original.headers = {
         ...(original.headers || {}),
         Authorization: `Bearer ${newAccessToken}`,
       };
       return api.request(original);
     } catch (e) {
-      // refresh не удался — чистим и пробрасываем ошибку
       clearTokens();
       return Promise.reject(e);
     } finally {
@@ -171,7 +164,6 @@ api.interceptors.response.use(
     }
   }
 );
-
 // ============ Хелпер: тихий рефреш при старте приложения ============
 /**
  * Попробовать освежить access при старте (если есть refresh).
