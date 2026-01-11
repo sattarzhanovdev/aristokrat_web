@@ -66,8 +66,8 @@ export default function Login() {
       // 1) логин
       const data = await postJson(`${API}/api/auth/login/`, { login, password });
 
-      if (data.accessToken) storage.setItem('accessToken', data.accessToken);
-      if (data.refreshToken) storage.setItem('refreshToken', data.refreshToken);
+      if (data.accessToken) storage.setItem('access', data.accessToken);
+      if (data.refreshToken) storage.setItem('refresh', data.refreshToken);
 
       // 2) разрешаем вход только активным жильцам
       try {

@@ -1,177 +1,125 @@
 import axios from "axios";
 
-/** ================== КОНФИГ ================== */
-// export const API_BASE = "https://aristokratamanat.pythonanywhere.com"; // поменяй при необходимости, либо оставь как есть
-// const REFRESH_URL = "https://aristokratamanat.pythonanywhere.com/api/auth/refresh"; // или твой реальный /api/token/refresh/
+/* ================== CONFIG ================== */
+export const API_BASE = "https://aristokratamanat.pythonanywhere.com";
+const REFRESH_URL = "/api/auth/refresh/";
 
-export const API_BASE = "https://aristokratamanat.pythonanywhere.com/"; // поменяй при необходимости, либо оставь как есть
-const REFRESH_URL = "/api/auth/refresh"; // или твой реальный /api/token/refresh/
+/* ================== TOKEN STORAGE ================== */
+const getAccess = () => localStorage.getItem("access");
+const getRefresh = () => localStorage.getItem("refresh");
 
+const setAccess = (t) => localStorage.setItem("access", t);
+const setRefresh = (t) => localStorage.setItem("refresh", t);
 
-/** ====== совместимость с разными ключами в storage ====== */
-function getAccess() {
-  return (
-    localStorage.getItem("access") ||
-    sessionStorage.getItem("access") ||
-    localStorage.getItem("accessToken") ||
-    sessionStorage.getItem("accessToken")
-  );
-}
-function getRefresh() {
-  return (
-    localStorage.getItem("refresh") ||
-    sessionStorage.getItem("refresh") ||
-    localStorage.getItem("refreshToken") ||
-    sessionStorage.getItem("refreshToken")
-  );
-}
-function setAccess(token) {
-  localStorage.setItem("access", token);
-  localStorage.setItem("accessToken", token); // legacy
-}
-function setRefresh(token) {
-  localStorage.setItem("refresh", token);
-  localStorage.setItem("refreshToken", token); // legacy
-}
-export function clearTokens() {
-  ["access","refresh","accessToken","refreshToken"].forEach(k=>{
-    localStorage.removeItem(k); sessionStorage.removeItem(k);
-  });
-}
+export const clearTokens = () => {
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
+};
 
-/** DRF любит закрывающий слеш */
-function ensureSlash(url) {
-  if (!url) return "/";
-  const q = url.indexOf("?");
-  if (q === -1) return url.endsWith("/") ? url : url + "/";
-  const p = url.slice(0, q), qs = url.slice(q);
-  return url;
-  // return (p.endsWith("/") ? p : p + "/") + qs;
-}
-
-/** ================== AXIOS ИНСТАНС ================== */
+/* ================== AXIOS INSTANCE ================== */
 const api = axios.create({
   baseURL: API_BASE,
-  withCredentials: false, // для JWT в заголовке куки не нужны
+  withCredentials: true,
 });
 
-// auth header
+let refreshing = false;
+let queue = [];
+
 api.interceptors.request.use((cfg) => {
   const t = getAccess();
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
   return cfg;
 });
 
-// refresh on 401
-let refreshing = false;
-let queue = [];
-
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config || {};
+    const original = error.config;
+
     if (
-      error?.response?.status === 401 &&
-      !original._retry &&
-      !String(original.url || "").includes(REFRESH_URL)
+      error.response?.status === 401 &&
+      !original?._retry &&
+      !String(original?.url || "").includes(REFRESH_URL)
     ) {
       original._retry = true;
 
-      if (!refreshing) {
-        refreshing = true;
-        try {
-          const r = getRefresh();
-          if (!r) throw new Error("No refresh token");
-          // прямым axios без baseURL, но с ensureSlash
-          const { data } = await axios.post(ensureSlash(API_BASE + REFRESH_URL.replace(/^\//,"")), { refresh: r });
-          if (!data?.access) throw new Error("Bad refresh response");
-          setAccess(data.access);
-          queue.forEach((resume) => resume(data.access));
-          queue = [];
-          window.location.reload()
-        } catch (e) {
-          queue = [];
-          refreshing = false;
-          // можно редиректить на /login
-          return Promise.reject(error);
-        }
-        refreshing = false;
+      if (refreshing) {
+        return new Promise((resolve) => {
+          queue.push((token) => {
+            original.headers.Authorization = `Bearer ${token}`;
+            resolve(api(original));
+          });
+        });
       }
 
-      return new Promise((resolve) => {
-        queue.push((newAccess) => {
-          original.headers = original.headers || {};
-          original.headers.Authorization = `Bearer ${newAccess}`;
-          resolve(api(original));
-        });
-      });
+      refreshing = true;
+
+      try {
+        const refresh = getRefresh();
+        if (!refresh) throw new Error("NO_REFRESH");
+
+        const { data } = await axios.post(
+          API_BASE + REFRESH_URL,
+          { refresh }
+        );
+
+        if (!data?.access) throw new Error("BAD_REFRESH");
+
+        setAccess(data.access);
+        if (data.refresh) setRefresh(data.refresh);
+
+        queue.forEach((cb) => cb(data.access));
+        queue = [];
+
+        original.headers.Authorization = `Bearer ${data.access}`;
+        return api(original);
+      } catch (e) {
+        clearTokens();
+        window.location.href = "/login";
+        return Promise.reject(e);
+      } finally {
+        refreshing = false;
+      }
     }
 
     return Promise.reject(error);
   }
 );
 
-/** ============ fetchJson (на тех же токенах) ============ */
-export async function fetchJson(path, options = {}) {
-  const url = ensureSlash(API_BASE + String(path).replace(/^\//, ""));
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const t = getAccess();
-  if (t) headers.Authorization = `Bearer ${t}`;
-
-  const doFetch = async () => {
-    const res = await fetch(url, {
-      method: options.method || "GET",
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-    let data = null;
-    try { data = await res.json(); } catch (_) {}
-    if (!res.ok) {
-      const err = new Error(data?.detail || data?.error || `HTTP ${res.status}`);
-      err.status = res.status;
-      err.response = data;
-      throw err;
-    }
-    return data;
-  };
-
-  try {
-    return await doFetch();
-  } catch (err) {
-    // один ретрай с refresh
-    if (err.status === 401 && !options._retry && !url.includes(REFRESH_URL)) {
-      const r = getRefresh();
-      if (!r) throw err;
-      const { data } = await axios.post(ensureSlash(API_BASE + REFRESH_URL.replace(/^\//,"")), { refreshToken: r });
-      const newAccess = data?.access || data?.accessToken;
-      if (!newAccess) throw err;
-      setAccess(newAccess);
-      return await fetchJson(path, { ...options, _retry: true });
-    }
-    throw err;
-  }
-}
-
-/** ====== публичные функции, которых ждёт твой код ====== */
-// шимы под старые вызовы
-export const tryRefreshAccessToken = async () => {
-  const r = getRefresh();
-  if (!r) return false;
-  try {
-    const { data } = await axios.post(ensureSlash(API_BASE + REFRESH_URL.replace(/^\//,"")), { refreshToken: r });
-    const newAccess = data?.access || data?.accessToken;
-    if (!newAccess) return false;
-    setAccess(newAccess);
-    return true;
-  } catch { return false; }
+/* ================== HELPERS ================== */
+export const fetchJson = async (url, options = {}) => {
+  const res = await api({
+    url,
+    method: options.method || "GET",
+    data: options.body,
+  });
+  return res.data;
 };
 
+export const tryRefreshAccessToken = async () => {
+  const refresh = getRefresh();
+  if (!refresh) return false;
+
+  try {
+    const { data } = await axios.post(
+      API_BASE + REFRESH_URL,
+      { refresh }
+    );
+    if (!data?.access) return false;
+    setAccess(data.access);
+    if (data.refresh) setRefresh(data.refresh);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/* ================== API METHODS ================== */
 export const getMe = async () => {
   const { data } = await api.get("/api/auth/me/");
-  // если бэк возвращает ещё и refresh — сохраним (редко, но вдруг)
   if (data?.access) setAccess(data.access);
   if (data?.refresh) setRefresh(data.refresh);
-  localStorage.setItem('user', JSON.stringify(data))
+  localStorage.setItem("user", JSON.stringify(data));
   return data;
 };
 
@@ -180,15 +128,14 @@ export const getResidentProfileMe = async () => {
   return data;
 };
 
-// новые методы
 export const getApprovalStatus = async () => {
   const { data } = await api.get("/api/me/approval-status/");
-  return data; // {status: "accepted" | "not_accepted"}
+  return data;
 };
 
 export const getPasswordStatus = async () => {
   const { data } = await api.get("/api/me/password-status/");
-  return data; // {status: "updated" | "not_updated"}
+  return data;
 };
 
 export const changePassword = async (oldPassword, newPassword) => {
@@ -196,10 +143,9 @@ export const changePassword = async (oldPassword, newPassword) => {
     old_password: oldPassword,
     new_password: newPassword,
   });
-  return data; // {status:"updated"}
+  return data;
 };
 
-// утилиты, если вдруг нужны где-то ещё
 export const getIsAdmin = async () => {
   const { data } = await api.get("/api/auth/me/");
   return Boolean(
@@ -209,9 +155,11 @@ export const getIsAdmin = async () => {
     data?.is_superuser
   );
 };
+
 export const getResidentEntranceNo = async () => {
   const { data } = await api.get("/api/profile/me/");
   return data?.entrance_no ?? null;
 };
 
+/* ================== DEFAULT EXPORT ================== */
 export default api;
