@@ -44,6 +44,8 @@ export default function Main() {
   const mounted = useRef(true);
 
   const apartment = JSON.parse(localStorage.getItem("user"))?.apartment_no;
+  console.log(apartment);
+  
   const isParkingHave = parkingBase.some(
     (p) => p.apartment_number === apartment
   );
@@ -204,7 +206,7 @@ export default function Main() {
       )}
 
       {/* ================= ПОЛЬЗОВАТЕЛЬ ================= */}
-      {!isAdmin && entranceNo && (
+      {!isAdmin && entranceNo && apartment !== "10000" && (
         <>
           <button
             className={cls(`door-${entranceNo}`)}
@@ -246,19 +248,23 @@ export default function Main() {
       )}
 
       {/* ================= КАЛИТКИ ================= */}
-      <div className={c.doors}>
-        {[1, 2, 3, 4].map((n) => (
-          <button
-            key={n}
-            className={cls(`kalitka${n}`)}
-            onClick={() =>
-              pulse(`kalitka${n}`, `/kalitka${n}/value`)
-            }
-          >
-            Калитка №{n}
-          </button>
-        ))}
-      </div>
+      {
+        apartment !== "10000" && (
+          <div className={c.doors}>
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                className={cls(`kalitka${n}`)}
+                onClick={() =>
+                  pulse(`kalitka${n}`, `/kalitka${n}/value`)
+                }
+              >
+                Калитка №{n}
+              </button>
+            ))}
+          </div>
+        )
+      }
 
       {/* ================= ПАРКОВКИ ================= */}
       {(isAdmin || isParkingHave) && (
