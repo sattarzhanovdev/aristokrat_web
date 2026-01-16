@@ -338,5 +338,10 @@
     "parking_number": "1000",
     "phone_number": "0559090581",
     "apartment_number": "10000"
+  },
+  {
+    "parking_number": "34",
+    "phone_number": "0501828009",
+    "apartment_number": "169"
   }
 ]
