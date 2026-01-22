@@ -3,16 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import c from "./main.module.scss";
 import parkingBase from "./parking_list.json";
 import logo from "../../images/logo.svg";
-import axios from "axios";
 
-import {
-  getResidentEntranceNo,
-  getIsAdmin,
-  getPasswordStatus,
-  changePassword,
-  getApprovalStatus,
-  fetchJson,
-} from "../../api";
+import api from "../../api";
 
 /* ================= Firebase ================= */
 const DB_URL =
@@ -33,6 +25,7 @@ const toBool = (v) =>
 
 /* ================================================= */
 export default function Main() {
+  const [user, setUser] = useState(null);
   const [entranceNo, setEntranceNo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,39 +36,38 @@ export default function Main() {
 
   const mounted = useRef(true);
 
-  const apartment = JSON.parse(localStorage.getItem("user"))?.apartment_no;
-  console.log(apartment);
-  
-  const isParkingHave = parkingBase.some(
-    (p) => p.apartment_number === apartment
-  );
-
-  /* ================= INIT ================= */
+  /* ================= LOGIN EVERY TIME ================= */
   useEffect(() => {
     mounted.current = true;
 
     (async () => {
       try {
-        const [admin, entrance, approval, pwd] = await Promise.all([
-          getIsAdmin(),
-          getResidentEntranceNo(),
-          getApprovalStatus(),
-          getPasswordStatus(),
-        ]);
+        const login = localStorage.getItem("login");
+        const password = localStorage.getItem("password");
 
-        if (approval?.status !== "accepted") {
-          alert("Ваш аккаунт ещё не одобрен");
+        if (!login || !password) {
+          window.location.href = "/login";
           return;
         }
 
-        setIsAdmin(admin);
-        setEntranceNo(entrance);
+        const { data } = await api.post("/api/auth/login/", {
+          login,
+          password,
+        });
 
-        if (pwd?.status === "not_updated") {
-          alert("Требуется смена пароля");
+        if (!mounted.current) return;
+
+        if (data.approval_status !== "accepted") {
+          alert("Ваш аккаунт ещё не одобрен администратором");
+          window.location.href = "/login";
+          return;
         }
+
+        setUser(data);
+        setIsAdmin(data.role === "admin");
+        setEntranceNo(data.entrance_no ?? null);
       } catch (e) {
-        console.error(e);
+        window.location.href = "/login";
       } finally {
         mounted.current && setLoading(false);
       }
@@ -86,9 +78,9 @@ export default function Main() {
     };
   }, []);
 
-  /* ================= FIREBASE (ОДНА ПОДПИСКА) ================= */
+  /* ================= FIREBASE ================= */
   useEffect(() => {
-    if (loading) return;
+    if (loading || !user) return;
 
     const es = new EventSource(toUrl("/"));
 
@@ -97,21 +89,18 @@ export default function Main() {
         const data = JSON.parse(e.data) || {};
         const next = {};
 
-        // подъезды
         Object.entries(data.entrances || {}).forEach(([no, e]) => {
           next[`door-${no}`] = toBool(e?.door?.value);
           next[`liftPass-${no}`] = toBool(e?.lift_pass?.value);
           next[`liftGruz-${no}`] = toBool(e?.lift_gruz?.value);
         });
 
-        // калитки
         [1, 2, 3, 4].forEach((n) => {
           if (data[`kalitka${n}`]?.value !== undefined) {
             next[`kalitka${n}`] = toBool(data[`kalitka${n}`].value);
           }
         });
 
-        // парковки + шлагбаум
         if (data.vorota1) {
           next.parking1 = toBool(data.vorota1.value);
           next.shlagbaum = toBool(data.vorota1.shlagbaum);
@@ -120,13 +109,25 @@ export default function Main() {
           next.parking2 = toBool(data.vorota2.value);
         }
 
-        setRemoteOn((prev) => ({ ...prev, ...next }));
+        mounted.current &&
+          setRemoteOn((prev) => ({ ...prev, ...next }));
       } catch {}
     };
 
     es.onerror = () => es.close();
     return () => es.close();
-  }, [loading]);
+  }, [loading, user]);
+
+  /* ================= PARKING ================= */
+  const apartment = user?.apartment_no ?? null;
+  const apartmentNorm =
+    apartment !== null ? String(apartment) : null;
+
+  const isParkingHave = apartmentNorm
+    ? parkingBase.some(
+        (p) => String(p.apartment_number) === apartmentNorm
+      )
+    : false;
 
   /* ================= ACTION ================= */
   const pulse = async (key, path) => {
@@ -150,14 +151,13 @@ export default function Main() {
 
   if (loading) return null;
 
-  /* ================= UI (ТВОЯ ВЕРСТКА) ================= */
+  /* ================= UI (ВЕРСТКА БЕЗ ИЗМЕНЕНИЙ) ================= */
   return (
     <div className={c.main}>
       <div className={c.logo}>
         <img src={logo} alt="logo" />
       </div>
 
-      {/* ================= АДМИН ================= */}
       {isAdmin && (
         <>
           <h3 className={c.section}>Подъезды (админ)</h3>
@@ -205,7 +205,6 @@ export default function Main() {
         </>
       )}
 
-      {/* ================= ПОЛЬЗОВАТЕЛЬ ================= */}
       {!isAdmin && entranceNo && apartment !== "10000" && (
         <>
           <button
@@ -232,6 +231,7 @@ export default function Main() {
             >
               Лифт (пассажир)
             </button>
+
             <button
               className={cls(`liftGruz-${entranceNo}`)}
               onClick={() =>
@@ -247,26 +247,23 @@ export default function Main() {
         </>
       )}
 
-      {/* ================= КАЛИТКИ ================= */}
-      {
-        apartment !== "10000" && (
-          <div className={c.doors}>
-            {[1, 2, 3, 4].map((n) => (
-              <button
-                key={n}
-                className={cls(`kalitka${n}`)}
-                onClick={() =>
-                  pulse(`kalitka${n}`, `/kalitka${n}/value`)
-                }
-              >
-                Калитка №{n}
-              </button>
-            ))}
-          </div>
-        )
-      }
 
-      {/* ================= ПАРКОВКИ ================= */}
+      {apartment !== "10000" && (
+        <div className={c.doors}>
+          {[1, 2, 3, 4].map((n) => (
+            <button
+              key={n}
+              className={cls(`kalitka${n}`)}
+              onClick={() =>
+                pulse(`kalitka${n}`, `/kalitka${n}/value`)
+              }
+            >
+              Калитка №{n}
+            </button>
+          ))}
+        </div>
+      )}
+
       {(isAdmin || isParkingHave) && (
         <>
           <button

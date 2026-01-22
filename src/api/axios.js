@@ -1,7 +1,8 @@
 // src/api/axios.js
 import axios from 'axios';
 
-const BASE_URL = 'https://aristokratamanat.pythonanywhere.com';
+// const BASE_URL = 'https://aristokratamanat.pythonanywhere.com';
+const BASE_URL = 'http://127.0.0.1:8000';
 
 // Инстанс для обычных запросов
 const api = axios.create({

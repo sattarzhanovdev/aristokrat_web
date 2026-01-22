@@ -1,90 +1,37 @@
 import axios from "axios";
 
 /* ================== CONFIG ================== */
-export const API_BASE = "https://aristokratamanat.pythonanywhere.com";
-const REFRESH_URL = "/api/auth/refresh/";
+export const API_BASE = "http://127.0.0.1:8000";
 
-/* ================== TOKEN STORAGE ================== */
-const getAccess = () => localStorage.getItem("access");
-const getRefresh = () => localStorage.getItem("refresh");
+/* ================== STORAGE ================== */
+export const getUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem("user"));
+  } catch {
+    return null;
+  }
+};
 
-const setAccess = (t) => localStorage.setItem("access", t);
-const setRefresh = (t) => localStorage.setItem("refresh", t);
+export const setUser = (user) => {
+  localStorage.setItem("user", JSON.stringify(user));
+};
 
-export const clearTokens = () => {
-  localStorage.removeItem("access");
-  localStorage.removeItem("refresh");
+export const clearUser = () => {
+  localStorage.removeItem("user");
 };
 
 /* ================== AXIOS INSTANCE ================== */
 const api = axios.create({
   baseURL: API_BASE,
-  withCredentials: true,
 });
 
-let refreshing = false;
-let queue = [];
-
-api.interceptors.request.use((cfg) => {
-  const t = getAccess();
-  if (t) cfg.headers.Authorization = `Bearer ${t}`;
-  return cfg;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    const original = error.config;
-
-    if (
-      error.response?.status === 401 &&
-      !original?._retry &&
-      !String(original?.url || "").includes(REFRESH_URL)
-    ) {
-      original._retry = true;
-
-      if (refreshing) {
-        return new Promise((resolve) => {
-          queue.push((token) => {
-            original.headers.Authorization = `Bearer ${token}`;
-            resolve(api(original));
-          });
-        });
-      }
-
-      refreshing = true;
-
-      try {
-        const refresh = getRefresh();
-        if (!refresh) throw new Error("NO_REFRESH");
-
-        const { data } = await axios.post(
-          API_BASE + REFRESH_URL,
-          { refresh }
-        );
-
-        if (!data?.access) throw new Error("BAD_REFRESH");
-
-        setAccess(data.access);
-        if (data.refresh) setRefresh(data.refresh);
-
-        queue.forEach((cb) => cb(data.access));
-        queue = [];
-
-        original.headers.Authorization = `Bearer ${data.access}`;
-        return api(original);
-      } catch (e) {
-        clearTokens();
-        window.location.href = "/login";
-        return Promise.reject(e);
-      } finally {
-        refreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
+/*
+  ❗️ ВАЖНО
+  Никаких interceptors:
+  - нет токенов
+  - нет refresh
+  - нет Authorization
+*/
 
 /* ================== HELPERS ================== */
 export const fetchJson = async (url, options = {}) => {
@@ -96,69 +43,82 @@ export const fetchJson = async (url, options = {}) => {
   return res.data;
 };
 
-export const tryRefreshAccessToken = async () => {
-  const refresh = getRefresh();
-  if (!refresh) return false;
+/* ================== AUTH ================== */
+export const login = async (login, password) => {
+  const { data } = await api.post("/api/auth/login/", {
+    login,
+    password,
+  });
 
-  try {
-    const { data } = await axios.post(
-      API_BASE + REFRESH_URL,
-      { refresh }
-    );
-    if (!data?.access) return false;
-    setAccess(data.access);
-    if (data.refresh) setRefresh(data.refresh);
-    return true;
-  } catch {
-    return false;
-  }
+  setUser(data);
+  return data;
 };
 
-/* ================== API METHODS ================== */
+export const logout = () => {
+  clearUser();
+  window.location.href = "/login";
+};
+
+/* ================== USER ================== */
 export const getMe = async () => {
-  const { data } = await api.get("/api/auth/me/");
-  if (data?.access) setAccess(data.access);
-  if (data?.refresh) setRefresh(data.refresh);
-  localStorage.setItem("user", JSON.stringify(data));
+  const user = getUser();
+  if (!user) throw new Error("NOT_AUTHENTICATED");
+  return user;
+};
+
+
+export const isAdmin = () => {
+  const user = getUser();
+  return user?.role === "admin";
+};
+
+export const isApproved = () => {
+  const user = getUser();
+  return user?.approval_status === "accepted";
+};
+
+/* ================== DATA ================== */
+export const getApartments = async (params = {}) => {
+  const { data } = await api.get("/api/apartments/", { params });
   return data;
 };
 
-export const getResidentProfileMe = async () => {
-  const { data } = await api.get("/api/profile/me/");
+export const getHouses = async () => {
+  const { data } = await api.get("/api/houses/");
   return data;
 };
 
-export const getApprovalStatus = async () => {
-  const { data } = await api.get("/api/me/approval-status/");
-  return data;
-};
-
-export const getPasswordStatus = async () => {
-  const { data } = await api.get("/api/me/password-status/");
-  return data;
-};
-
-export const changePassword = async (oldPassword, newPassword) => {
-  const { data } = await api.post("/api/me/change-password/", {
-    old_password: oldPassword,
-    new_password: newPassword,
+export const getEntrances = async (house) => {
+  const { data } = await api.get("/api/entrances/", {
+    params: { house },
   });
   return data;
 };
 
-export const getIsAdmin = async () => {
-  const { data } = await api.get("/api/auth/me/");
-  return Boolean(
-    data?.adminFlag ??
-    data?.is_admin ??
-    data?.is_staff ??
-    data?.is_superuser
+/* ================== DEVICES ================== */
+export const getEntranceDeviceState = async (entranceNo, kind) => {
+  const { data } = await api.get(
+    `/api/entrances/${entranceNo}/${kind}/`
   );
+  return data;
 };
 
-export const getResidentEntranceNo = async () => {
-  const { data } = await api.get("/api/profile/me/");
-  return data?.entrance_no ?? null;
+export const setEntranceDeviceState = async (entranceNo, kind, state) => {
+  const { data } = await api.post(
+    `/api/entrances/${entranceNo}/${kind}/`,
+    { state }
+  );
+  return data;
+};
+
+export const getGlobalDeviceState = async (kind) => {
+  const { data } = await api.get(`/api/${kind}/`);
+  return data;
+};
+
+export const setGlobalDeviceState = async (kind, state) => {
+  const { data } = await api.post(`/api/${kind}/`, { state });
+  return data;
 };
 
 /* ================== DEFAULT EXPORT ================== */
