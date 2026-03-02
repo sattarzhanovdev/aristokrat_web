@@ -168,5 +168,10 @@
     "parking_number": "15",
     "phone_number": "0997030622",
     "apartment_number": "9"
+  },
+  {
+    "parking_number": "125",
+    "phone_number": "0557022222",
+    "apartment_number": "159"
   }
 ]
