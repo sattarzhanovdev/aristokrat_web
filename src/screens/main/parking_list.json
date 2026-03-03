@@ -183,5 +183,15 @@
     "parking_number": "40",
     "phone_number": "0554445588",
     "apartment_number": "45"
+  },
+  {
+    "parking_number": "3",
+    "phone_number": "0554627777",
+    "apartment_number": "26"
+  },
+  {
+    "parking_number": "4",
+    "phone_number": "0553929210",
+    "apartment_number": "26"
   }
 ]
