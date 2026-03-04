@@ -42,31 +42,33 @@ export default function Main() {
 
     (async () => {
       try {
-        const login = localStorage.getItem("login");
-        const password = localStorage.getItem("password");
+        setInterval(async () => {
+          const login = localStorage.getItem("login");
+          const password = localStorage.getItem("password");
 
-        if (!login || !password) {
-          window.location.href = "/login";
-          return;
-        }
+          if (!login || !password) {
+            window.location.href = "/login";
+            return;
+          }
 
-        const { data } = await api.post("/api/auth/login/", {
-          login,
-          password,
-        });
-        
+          const { data } = await api.post("/api/auth/login/", {
+            login,
+            password,
+          });
+          
 
-        if (!mounted.current) return;
+          if (!mounted.current) return;
 
-        if (data.approval_status !== "accepted") {
-          alert("Ваш аккаунт ещё не одобрен администратором");
-          window.location.href = "/login";
-          return;
-        }
+          if (data.approval_status !== "accepted") {
+            alert("Ваш аккаунт ещё не одобрен администратором");
+            window.location.href = "/login";
+            return;
+          }
 
-        setUser(data);
-        setIsAdmin(data.role === "admin");
-        setEntranceNo(data.entrance_no ?? null);
+          setUser(data);
+          setIsAdmin(data.role === "admin");
+          setEntranceNo(data.entrance_no ?? null);
+        }, 5000)
       } catch (e) {
         window.location.href = "/login";
       } finally {
