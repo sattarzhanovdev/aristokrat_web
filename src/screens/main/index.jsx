@@ -54,6 +54,7 @@ export default function Main() {
           login,
           password,
         });
+        
 
         if (!mounted.current) return;
 
@@ -123,11 +124,8 @@ export default function Main() {
   const apartmentNorm =
     apartment !== null ? String(apartment) : null;
 
-  const isParkingHave = apartmentNorm
-    ? parkingBase.some(
-        (p) => String(p.apartment_number) === apartmentNorm
-      )
-    : false;
+  const isParkingHave = user?.has_parking
+  
 
   /* ================= ACTION ================= */
   const pulse = async (key, path) => {
