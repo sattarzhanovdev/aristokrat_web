@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import c from './login.module.scss';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import c from "./login.module.scss";
 
-const API = 'https://aristokratamanat.pythonanywhere.com';
+const API = "https://aristokratamanat.pythonanywhere.com";
 
 // --- helpers ---
 async function postJson(url, body) {
   const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
 
-  const ct = res.headers.get('content-type') || '';
-  const data = ct.includes('application/json')
+  const ct = res.headers.get("content-type") || "";
+  const data = ct.includes("application/json")
     ? await res.json()
     : await res.text();
 
   if (!res.ok) {
     const msg =
-      typeof data === 'object' && data?.message
+      typeof data === "object" && data?.message
         ? data.message
         : data || res.statusText;
     const err = new Error(msg);
@@ -32,12 +32,12 @@ async function postJson(url, body) {
 export default function Login() {
   const navigate = useNavigate();
 
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const canSubmit = login.trim() && password.trim();
   const storage = remember ? localStorage : sessionStorage;
@@ -47,33 +47,43 @@ export default function Login() {
     if (!canSubmit) return;
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       // === LOGIN ===
-      const user = await postJson(`${API}/api/auth/login/`, {
+      const data = await postJson(`${API}/api/auth/login/`, {
         login,
         password,
       });
 
+      const user = data.user || data;
+
       // === ПРОВЕРКИ ===
-      if (user.approval_status === 'not_accepted') {
-        throw new Error('Ваш профиль ещё не подтверждён администратором');
+      if (user.approval_status === "not_accepted") {
+        throw new Error("Ваш профиль ещё не подтверждён администратором");
       }
 
       // === СОХРАНЯЕМ ДАННЫЕ ДЛЯ ПОВТОРНОГО ЛОГИНА ===
       storage.setItem("login", login);
       storage.setItem("password", password);
 
-      // === СОХРАНЯЕМ ПОЛЬЗОВАТЕЛЯ ===
-      storage.setItem('user', JSON.stringify(user));
+      // === СОХРАНЯЕМ ТОКЕНЫ ЕСЛИ ЕСТЬ ===
+      if (data.accessToken) {
+        storage.setItem("accessToken", data.accessToken);
+      }
+      if (data.refreshToken) {
+        storage.setItem("refreshToken", data.refreshToken);
+      }
 
-      navigate('/', { replace: true });
+      // === СОХРАНЯЕМ ПОЛЬЗОВАТЕЛЯ ===
+      storage.setItem("user", JSON.stringify(user));
+
+      navigate("/", { replace: true });
     } catch (err) {
       if (err.status === 400 || err.status === 401) {
-        setError(err.message || 'Неверный логин или пароль');
+        setError(err.message || "Неверный логин или пароль");
       } else {
-        setError(err.message || 'Не удалось войти. Попробуйте ещё раз.');
+        setError(err.message || "Не удалось войти. Попробуйте ещё раз.");
       }
     } finally {
       setLoading(false);
@@ -105,7 +115,7 @@ export default function Login() {
             <div className={c.passWrap}>
               <input
                 className={c.input}
-                type={showPass ? 'text' : 'password'}
+                type={showPass ? "text" : "password"}
                 placeholder="Пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -115,15 +125,26 @@ export default function Login() {
                 className={c.eye}
                 onClick={() => setShowPass((s) => !s)}
               >
-                {showPass ? '🙈' : '👁️'}
+                {showPass ? "🙈" : "👁️"}
               </button>
             </div>
           </label>
 
+          <div className={c.row}>
+            <label className={c.checkbox}>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              Запомнить меня
+            </label>
+          </div>
+
           {error && <div className={c.errorBox}>{error}</div>}
 
           <button type="submit" className={c.submit} disabled={!canSubmit}>
-            {loading ? 'Входим…' : 'Войти'}
+            {loading ? "Входим…" : "Войти"}
           </button>
         </form>
       </div>

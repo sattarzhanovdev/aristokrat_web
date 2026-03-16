@@ -1,7 +1,11 @@
 // Main.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import c from "./main.module.scss";
-import parkingBase from "./parking_list.json";
 import logo from "../../images/logo.svg";
 
 import api from "../../api";
@@ -20,11 +24,14 @@ const rtdbSetBoolean = async (path, value) => {
   });
 };
 
-const toBool = (v) =>
-  v === true || v === "true" || v === 1 || v === "1";
+const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
 
 /* ================================================= */
 export default function Main() {
+  const mounted = useRef(false);
+  const lastCheckedRef = useRef(0);
+  const activeTimersRef = useRef({});
+
   const [user, setUser] = useState(null);
   const [entranceNo, setEntranceNo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -34,50 +41,72 @@ export default function Main() {
   const [busy, setBusy] = useState({});
   const [active, setActive] = useState({});
 
-  const mounted = useRef(true);
+  const flashActive = useCallback((key, ms = 1000) => {
+    setActive((s) => ({ ...s, [key]: true }));
+
+    const prevTimer = activeTimersRef.current[key];
+    if (prevTimer) clearTimeout(prevTimer);
+
+    activeTimersRef.current[key] = setTimeout(() => {
+      if (!mounted.current) return;
+      setActive((s) => ({ ...s, [key]: false }));
+      delete activeTimersRef.current[key];
+    }, ms);
+  }, []);
 
   /* ================= LOGIN EVERY TIME ================= */
   useEffect(() => {
     mounted.current = true;
 
-    (async () => {
+    const checkAuth = async () => {
+      const now = Date.now();
+      if (now - lastCheckedRef.current < 30000) return; // check every 30 sec
+
       try {
-        setInterval(async () => {
-          const login = localStorage.getItem("login");
-          const password = localStorage.getItem("password");
+        const login =
+          localStorage.getItem("login") || sessionStorage.getItem("login");
+        const password =
+          localStorage.getItem("password") || sessionStorage.getItem("password");
 
-          if (!login || !password) {
-            window.location.href = "/login";
-            return;
-          }
+        if (!login || !password) {
+          if (mounted.current) setLoading(false);
+          window.location.href = "/login";
+          return;
+        }
 
-          const { data } = await api.post("/api/auth/login/", {
-            login,
-            password,
-          });
-          
+        const { data } = await api.post("/api/auth/login/", {
+          login,
+          password,
+        });
 
-          if (!mounted.current) return;
+        if (!mounted.current) return;
 
-          if (data.approval_status !== "accepted") {
-            alert("Ваш аккаунт ещё не одобрен администратором");
-            window.location.href = "/login";
-            return;
-          }
+        if (data.approval_status !== "accepted") {
+          alert("Ваш аккаунт ещё не одобрен администратором");
+          setLoading(false);
+          window.location.href = "/login";
+          return;
+        }
 
-          setUser(data);
-          setIsAdmin(data.role === "admin");
-          setEntranceNo(data.entrance_no ?? null);
-        }, 5000)
+        setUser(data);
+        setIsAdmin(data.role === "admin");
+        setEntranceNo(data.entrance_no ?? null);
+        lastCheckedRef.current = now;
+        setLoading(false);
       } catch (e) {
+        if (mounted.current) setLoading(false);
         window.location.href = "/login";
-      } finally {
-        mounted.current && setLoading(false);
       }
-    })();
+    };
+
+    checkAuth();
+    const intervalId = setInterval(checkAuth, 5000);
 
     return () => {
       mounted.current = false;
+      Object.values(activeTimersRef.current).forEach((t) => clearTimeout(t));
+      activeTimersRef.current = {};
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -112,8 +141,7 @@ export default function Main() {
           next.parking2 = toBool(data.vorota2.value);
         }
 
-        mounted.current &&
-          setRemoteOn((prev) => ({ ...prev, ...next }));
+        mounted.current && setRemoteOn((prev) => ({ ...prev, ...next }));
       } catch {}
     };
 
@@ -123,29 +151,27 @@ export default function Main() {
 
   /* ================= PARKING ================= */
   const apartment = user?.apartment_no ?? null;
-  const apartmentNorm =
-    apartment !== null ? String(apartment) : null;
-
-  const isParkingHave = user?.has_parking
-  
+  const isParkingHave = !!user?.has_parking;
 
   /* ================= ACTION ================= */
-  const pulse = async (key, path) => {
-    if (busy[key] || remoteOn[key]) return;
+  const pulse = useCallback(
+    async (key, path) => {
+      flashActive(key, 1000);
+      if (busy[key] || remoteOn[key]) return;
 
-    setBusy((s) => ({ ...s, [key]: true }));
-    setActive((s) => ({ ...s, [key]: true }));
+      setBusy((s) => ({ ...s, [key]: true }));
 
-    try {
-      await rtdbSetBoolean(path, true);
-      setTimeout(() => rtdbSetBoolean(path, false), 1000);
-    } finally {
-      setTimeout(() => {
-        setBusy((s) => ({ ...s, [key]: false }));
-        setActive((s) => ({ ...s, [key]: false }));
-      }, 1200);
-    }
-  };
+      try {
+        await rtdbSetBoolean(path, true);
+        setTimeout(() => rtdbSetBoolean(path, false), 1000);
+      } finally {
+        setTimeout(() => {
+          setBusy((s) => ({ ...s, [key]: false }));
+        }, 1200);
+      }
+    },
+    [busy, remoteOn, flashActive],
+  );
 
   const cls = (key) => (active[key] ? c.active : "");
 
@@ -180,7 +206,7 @@ export default function Main() {
                       onClick={() =>
                         pulse(
                           `liftPass-${no}`,
-                          `/entrances/${no}/lift_pass/value`
+                          `/entrances/${no}/lift_pass/value`,
                         )
                       }
                     >
@@ -191,7 +217,7 @@ export default function Main() {
                       onClick={() =>
                         pulse(
                           `liftGruz-${no}`,
-                          `/entrances/${no}/lift_gruz/value`
+                          `/entrances/${no}/lift_gruz/value`,
                         )
                       }
                     >
@@ -210,10 +236,7 @@ export default function Main() {
           <button
             className={cls(`door-${entranceNo}`)}
             onClick={() =>
-              pulse(
-                `door-${entranceNo}`,
-                `/entrances/${entranceNo}/door/value`
-              )
+              pulse(`door-${entranceNo}`, `/entrances/${entranceNo}/door/value`)
             }
           >
             Подъезд №{entranceNo}
@@ -225,7 +248,7 @@ export default function Main() {
               onClick={() =>
                 pulse(
                   `liftPass-${entranceNo}`,
-                  `/entrances/${entranceNo}/lift_pass/value`
+                  `/entrances/${entranceNo}/lift_pass/value`,
                 )
               }
             >
@@ -237,7 +260,7 @@ export default function Main() {
               onClick={() =>
                 pulse(
                   `liftGruz-${entranceNo}`,
-                  `/entrances/${entranceNo}/lift_gruz/value`
+                  `/entrances/${entranceNo}/lift_gruz/value`,
                 )
               }
             >
@@ -247,16 +270,13 @@ export default function Main() {
         </>
       )}
 
-
       {apartment !== "10000" && (
         <div className={c.doors}>
           {[1, 2, 3, 4].map((n) => (
             <button
               key={n}
               className={cls(`kalitka${n}`)}
-              onClick={() =>
-                pulse(`kalitka${n}`, `/kalitka${n}/value`)
-              }
+              onClick={() => pulse(`kalitka${n}`, `/kalitka${n}/value`)}
             >
               Калитка №{n}
             </button>
@@ -268,27 +288,21 @@ export default function Main() {
         <>
           <button
             className={cls("shlagbaum")}
-            onClick={() =>
-              pulse("shlagbaum", "/vorota1/shlagbaum")
-            }
+            onClick={() => pulse("shlagbaum", "/vorota1/shlagbaum")}
           >
             Шлагбаум
           </button>
 
           <button
             className={cls("parking1")}
-            onClick={() =>
-              pulse("parking1", "/vorota1/value")
-            }
+            onClick={() => pulse("parking1", "/vorota1/value")}
           >
             Паркинг1
           </button>
 
           <button
             className={cls("parking2")}
-            onClick={() =>
-              pulse("parking2", "/vorota2/value")
-            }
+            onClick={() => pulse("parking2", "/vorota2/value")}
           >
             Паркинг2
           </button>

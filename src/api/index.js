@@ -1,4 +1,4 @@
-import axios from "axios";
+import { api as axiosApi } from "./axios";
 
 /* ================== CONFIG ================== */
 export const API_BASE = "https://aristokratamanat.pythonanywhere.com";
@@ -21,17 +21,7 @@ export const clearUser = () => {
 };
 
 /* ================== AXIOS INSTANCE ================== */
-const api = axios.create({
-  baseURL: API_BASE,
-});
-
-/*
-  ❗️ ВАЖНО
-  Никаких interceptors:
-  - нет токенов
-  - нет refresh
-  - нет Authorization
-*/
+const api = axiosApi;
 
 /* ================== HELPERS ================== */
 export const fetchJson = async (url, options = {}) => {

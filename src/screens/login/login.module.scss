@@ -59,6 +59,7 @@
 
 /* инпуты: минимум 16px шрифт — чтобы iOS не зумил экран */
 .input {
+  width: 100%;
   height: 52px;
   border: 2px solid #d1d5db;
   border-radius: 12px;

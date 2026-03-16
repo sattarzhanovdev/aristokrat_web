@@ -27,6 +27,11 @@
     color: white;
     font-size: 24px;
     cursor: pointer;
+    transition: background-color .15s ease, transform .05s ease;
+    &:active { transform: translateY(1px); }
+  }
+  .active{
+    background: #0a6d3b;
   }
 
   .elevators{
