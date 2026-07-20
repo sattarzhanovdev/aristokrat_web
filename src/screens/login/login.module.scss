@@ -1,90 +1,94 @@
-/* ===== login.module.scss (mobile-first) ===== */
+/* ===== Login (Apple-style, mobile-first) ===== */
 
-:root {
-  --topbar-h: 64px;          /* высота твоей верхней синей панели */
-}
-
-/* страница */
 .loginPage {
   width: 100%;
-  min-height: 100dvh;        /* корректная высота на мобильных */
-  // padding:
-  //   calc(env(safe-area-inset-top, 0px) + var(--topbar-h) + 16px)
-  //   16px
-  //   calc(env(safe-area-inset-bottom, 0px) + 24px);
-  background: #eef1f6;
+  min-height: 100dvh;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 20px
+    calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background:
+    radial-gradient(120% 80% at 50% -10%, var(--navy-tint) 0%, transparent 55%),
+    var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-
-  /* если нет топбара на каких-то экранах — просто обнули высоту */
-  &.noTopbar { --topbar-h: 0px; }
 }
 
-/* карточка */
 .card {
-  width: 80%;
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.08);
-  padding: clamp(18px, 3.5vw, 28px);
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  padding: clamp(24px, 6vw, 34px);
 }
 
-/* заголовок */
 .header {
   text-align: center;
-  margin-bottom: clamp(10px, 2vw, 18px);
+  margin-bottom: clamp(18px, 4vw, 26px);
 
   h1 {
     margin: 0 0 6px;
-    font-size: clamp(22px, 4.8vw, 30px);
-    color: #082e55;
+    font-size: clamp(26px, 6vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
   }
+
   p {
     margin: 0;
-    color: #6b7280;
-    font-size: clamp(13px, 3.5vw, 16px);
+    color: var(--ink-3);
+    font-size: clamp(14px, 3.6vw, 16px);
   }
 }
 
-/* форма */
-.form { display: grid; gap: 14px; }
+.form {
+  display: grid;
+  gap: 16px;
+}
 
 .label {
-  font-size: 14px;
-  color: #1f2937;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
   display: grid;
   gap: 8px;
 }
 
-/* инпуты: минимум 16px шрифт — чтобы iOS не зумил экран */
 .input {
   width: 100%;
   height: 52px;
-  border: 2px solid #d1d5db;
-  border-radius: 12px;
-  padding: 0 14px;
-  font-size: 16px;           /* важно для мобильных */
-  background: #fff;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-sm);
+  padding: 0 15px;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--surface);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+
+  &::placeholder {
+    color: var(--ink-3);
+  }
 
   &:focus {
     outline: none;
-    border-color: #082e55;
-    box-shadow: 0 0 0 4px rgba(8,46,85,.12);
+    border-color: var(--navy-600);
+    box-shadow: 0 0 0 4px rgba(0, 52, 99, 0.12);
   }
 
   &.error {
-    border-color: #e63946;
-    box-shadow: 0 0 0 4px rgba(230,57,70,.12);
+    border-color: var(--danger);
+    box-shadow: 0 0 0 4px rgba(255, 59, 48, 0.12);
   }
 }
 
-/* глазик в пароле — без сдвига layout */
-.passWrap { position: relative; }
+.passWrap {
+  position: relative;
+}
+
 .eye {
   position: absolute;
-  right: 10px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   border: none;
@@ -92,16 +96,22 @@
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
-  padding: 6px;
+  padding: 8px;
+  border-radius: var(--r-pill);
+  transition: background 0.18s var(--ease);
+
+  &:hover {
+    background: var(--surface-2);
+  }
 }
 
-/* чекбокс/ссылка в одну линию и не прыгают */
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  margin-top: -2px;
 }
 
 .checkbox {
@@ -109,65 +119,64 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
+  color: var(--ink-2);
+  cursor: pointer;
 
-  input { width: 18px; height: 18px; accent-color: #082e55; }
+  input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--navy-800);
+  }
 }
 
 .linkBtn {
   border: none;
   background: transparent;
-  color: #082e55;
+  color: var(--navy-700);
   cursor: pointer;
   font-size: 14px;
   padding: 4px 6px;
 
-  &:hover { color: #0a3766; text-decoration: underline; }
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
-/* сообщение об ошибке */
 .errorBox {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 10px 12px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid rgba(255, 59, 48, 0.22);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
   font-size: 14px;
 }
 
-/* кнопка отправки: фиксируем поведение на узких экранах */
 .submit {
   height: 54px;
   border: none;
-  border-radius: 14px;
-  background: #082e55;
+  border-radius: var(--r-md);
+  background: linear-gradient(180deg, var(--navy-700) 0%, var(--navy-800) 100%);
   color: #fff;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 600;
   cursor: pointer;
   width: 100%;
-  transition: transform .05s ease, background .15s ease, opacity .15s ease;
+  margin-top: 4px;
+  box-shadow: var(--shadow-brand);
+  transition: transform 0.14s var(--ease), filter 0.18s var(--ease),
+    opacity 0.18s var(--ease);
 
-  &:hover { background: #0a3766; }
-  &:active { transform: translateY(1px); }
-  &:disabled { opacity: .6; cursor: not-allowed; }
-}
-
-/* ===== медиазапросы ===== */
-
-/* планшеты: немного больше сетка/поля */
-@media (min-width: 600px) {
-  .loginPage {
-    padding-left: 24px;
-    padding-right: 24px;
+  &:hover {
+    filter: brightness(1.06);
   }
-  .form { gap: 16px; }
-}
 
-/* десктопы: центрируем сильнее и увеличиваем внутренние отступы карточки */
-@media (min-width: 1024px) {
-  .loginPage {
-    place-items: center;                /* теперь почти по центру на десктопе */
-    padding-top: calc(var(--topbar-h) + 32px);
+  &:active {
+    transform: scale(0.98);
   }
-  .card { padding: 32px; }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 }

@@ -64,9 +64,11 @@ export default function App() {
     return <div style={{ height: "100vh" }} />;
   }
 
+  const showNavbar = !PUBLIC_PATHS.has(pathname);
+
   return (
     <div>
-      <Components.Navbar />
+      {showNavbar && <Components.Navbar />}
       <MainRoutes />
     </div>
   );

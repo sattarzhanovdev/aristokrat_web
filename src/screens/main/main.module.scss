@@ -1,131 +1,257 @@
-.main{
+/* ================= Main control panel ================= */
+
+.main {
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: calc(var(--nav-h) + 24px) clamp(16px, 4vw, 24px)
+    calc(env(safe-area-inset-bottom, 0px) + 64px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+/* --- Brand logo card --- */
+.logo {
+  width: 100%;
+  height: 132px;
+  background: linear-gradient(135deg, var(--navy-700) 0%, var(--navy-900) 100%);
+  border-radius: var(--r-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-brand);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 4px;
+
+  /* subtle sheen */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      120% 80% at 20% -10%,
+      rgba(255, 255, 255, 0.18),
+      transparent 60%
+    );
+    pointer-events: none;
+  }
+
+  img {
+    height: 62%;
+    max-width: 78%;
+    object-fit: contain;
+    position: relative;
+    z-index: 1;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
+  }
+}
+
+/* --- Section headings --- */
+.section {
+  margin: 14px 2px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* --- Base control button (Apple-style tactile tile) --- */
+.main button {
+  width: 100%;
+  min-height: 64px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, var(--navy-700) 0%, var(--navy-800) 100%);
+  border-radius: var(--r-lg);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: transform 0.14s var(--ease), box-shadow var(--dur) var(--ease),
+    background var(--dur) var(--ease), filter var(--dur) var(--ease);
+
+  &:hover {
+    filter: brightness(1.06);
+  }
+
+  &:active {
+    transform: scale(0.975);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* --- Active / "signal sent" pulse --- */
+.active {
+  background: linear-gradient(180deg, #3bd06a 0%, #23a94f 100%) !important;
+  box-shadow: 0 8px 24px rgba(52, 199, 89, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  animation: pulse 0.9s var(--ease);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.015);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- Elevators (two tall tiles side by side) --- */
+.elevators {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  button {
+    min-height: 108px;
+    font-size: 16px;
+  }
+}
+
+/* --- Kalitka doors (row of 4 compact tiles) --- */
+.doors {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+
+  button {
+    min-height: 96px;
+    font-size: 13px;
+    padding: 12px 8px;
+    line-height: 1.2;
+  }
+}
+
+/* --- Admin grid of entrances --- */
+.grid {
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-top: 84px;
-  gap: 20px;
-  padding-bottom: 200px;
-  .logo{
-    width: 90%;
-    height: 120px;
-    background: #003463;
-    border-radius: 20px;
+  gap: 12px;
+
+  .entranceCard {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 16px;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    img{
-      height: 80%;
-    }
-  }
-  button{
-    width: 90%;
-    height: 60px;
-    background: #003463;
-    border-radius: 20px;
-    border: none;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    transition: background-color .15s ease, transform .05s ease;
-    &:active { transform: translateY(1px); }
-  }
-  .active{
-    background: #0a6d3b;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .elevators{
-    width: 90%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    button{
-      width: 100%;
-      height: 100px;
-    }
+  .entranceTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0;
   }
-  .doors{
-    width: 90%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    button{
-      width: 23%;
-      height: 100px;
-      font-size: 14px;
-    }
-  }
-  .grid{
+
+  .entranceButtons {
     width: 100%;
     display: flex;
-    align-items: center;
     flex-direction: column;
     gap: 10px;
-    button{
-      width: 100%;
-      margin-bottom: 10px;
-      &:disabled{
-        background: rgb(116, 0, 0);
-      }
+
+    button:disabled {
+      background: linear-gradient(180deg, #ff5a4f 0%, #e0342a 100%);
+      opacity: 0.9;
+      cursor: not-allowed;
     }
-    .entranceCard{
+
+    .row {
       width: 100%;
-      display: flex;
-      align-items: center;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 10px;
-      .entranceTitle{
-        margin-bottom: 10px;
-      }
-      button{
-        width: 100%;
-        margin-bottom: 10px;
-        &:disabled{
-          background: rgb(116, 0, 0);
-        }
-      }
-    }
-    .entranceButtons{
-      width: 90%;
-      .row{
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        button{
-          width: 100%;
-          height: 60px;
-          &:disabled{
-            background: rgb(116, 0, 0);
-          }
-        }
+
+      button {
+        min-height: 60px;
+        font-size: 15px;
       }
     }
   }
 }
 
+/* ================= Password modal ================= */
 .modalBackdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
 .modal {
-  width: min(520px, 92vw);
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  width: min(460px, 100%);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-lg);
 }
 
-.modalDesc { margin: 6px 0 16px; color: #555; }
+.modalDesc {
+  margin: 6px 0 18px;
+  color: var(--ink-2);
+}
 
 .pwdForm {
-  display: grid; gap: 12px;
-  label { display: grid; gap: 6px; font-weight: 600; }
-  input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; }
+  display: grid;
+  gap: 14px;
+
+  label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  input {
+    padding: 12px 14px;
+    border: 1px solid var(--hairline-strong);
+    border-radius: var(--r-sm);
+    font-size: 16px;
+
+    &:focus {
+      outline: none;
+      border-color: var(--navy-600);
+      box-shadow: 0 0 0 4px rgba(0, 52, 99, 0.12);
+    }
+  }
 }
 
-.modalActions { margin-top: 8px; display: flex; justify-content: flex-end; }
-.errorInline { color: #b00020; font-size: 0.9rem; }
+.modalActions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.errorInline {
+  color: var(--danger-text);
+  font-size: 0.9rem;
+}
+
+/* ================= Responsive ================= */
+@media (min-width: 600px) {
+  .doors button {
+    font-size: 14px;
+  }
+}

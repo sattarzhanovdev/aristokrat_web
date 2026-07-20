@@ -1,28 +1,50 @@
-.navbar{
+.navbar {
   width: 100%;
-  height: 60px;
-  background-color: #003463;
-  display: flex;
-  justify-content: center;
-  padding: 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: var(--nav-h);
   position: fixed;
   top: 0;
   left: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
 
-  .container{
-    width: 90%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    .block{
-      color: #003463;
-      font-size: 18px;
-      background: white;
-      cursor: pointer;
-      padding: 10px 12px;
-      border-radius: 50px;
-      margin-right: 0 20px;
-    }
+  /* frosted glass */
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.container {
+  width: 100%;
+  max-width: var(--page-max);
+  padding: 0 clamp(16px, 4vw, 24px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.block {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--navy-800);
+  font-size: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  cursor: pointer;
+  border-radius: var(--r-pill);
+  transition: background var(--dur) var(--ease), transform 0.12s var(--ease),
+    box-shadow var(--dur) var(--ease);
+
+  &:hover {
+    background: var(--navy-tint);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:active {
+    transform: scale(0.94);
   }
 }
