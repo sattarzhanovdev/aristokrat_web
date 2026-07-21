@@ -49,6 +49,54 @@
   }
 }
 
+/* --- Greeting --- */
+.hello {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 2px 2px 0;
+  margin-top: -2px;
+}
+
+.helloText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.helloGreet {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.helloName {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  background: var(--navy-tint);
+  color: var(--navy-700);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* --- Section headings --- */
 .section {
   margin: 14px 2px 2px;
@@ -68,13 +116,21 @@
   border-radius: var(--r-lg);
   border: none;
   color: #fff;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
   box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   transition: transform 0.14s var(--ease), box-shadow var(--dur) var(--ease),
     background var(--dur) var(--ease), filter var(--dur) var(--ease);
+
+  /* default: icon + label side by side (full-width buttons) */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow: hidden;
 
   &:hover {
     filter: brightness(1.06);
@@ -83,6 +139,92 @@
   &:active {
     transform: scale(0.975);
     box-shadow: var(--shadow-sm);
+  }
+}
+
+.lbl {
+  position: relative;
+  z-index: 1;
+}
+
+/* live badge — device is currently open (from Firebase) */
+.badgeLive {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 600;
+  color: #bff7cf;
+  background: rgba(52, 199, 89, 0.18);
+  border: 1px solid rgba(52, 199, 89, 0.35);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34c759;
+  box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6);
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(52, 199, 89, 0);
+  }
+}
+
+/* "Открыто" badge shown during the tap-pulse */
+.badgeOpen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* subtle ring when a control is live/open */
+.live:not(.active) {
+  box-shadow: var(--shadow-md), inset 0 0 0 1.5px rgba(52, 199, 89, 0.5);
+}
+
+/* icon inside a control */
+.ic {
+  flex-shrink: 0;
+  font-size: 26px;
+  width: 1em;
+  height: 1em;
+}
+
+/* full-width horizontal control (door, shlagbaum, entrance) */
+.wide {
+  .ic {
+    font-size: 24px;
+  }
+}
+
+/* stacked tile: icon on top, label below (grid controls) */
+.tile {
+  flex-direction: column !important;
+  gap: 10px !important;
+  text-align: center;
+  line-height: 1.15;
+
+  .ic {
+    font-size: 32px;
   }
 }
 
@@ -106,7 +248,8 @@
   }
 }
 
-/* --- Elevators (two tall tiles side by side) --- */
+/* --- Pair of tall tiles side by side (elevators, parking) --- */
+.pair,
 .elevators {
   width: 100%;
   display: grid;
@@ -114,23 +257,22 @@
   gap: 12px;
 
   button {
-    min-height: 108px;
-    font-size: 16px;
+    min-height: 120px;
+    font-size: 15px;
   }
 }
 
-/* --- Kalitka doors (row of 4 compact tiles) --- */
+/* --- Kalitka doors (2×2 grid of tiles) --- */
 .doors {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 
   button {
-    min-height: 96px;
-    font-size: 13px;
-    padding: 12px 8px;
-    line-height: 1.2;
+    min-height: 104px;
+    font-size: 15px;
+    padding: 14px 10px;
   }
 }
 
@@ -179,8 +321,8 @@
       gap: 10px;
 
       button {
-        min-height: 60px;
-        font-size: 15px;
+        min-height: 100px;
+        font-size: 14px;
       }
     }
   }
@@ -247,6 +389,40 @@
 .errorInline {
   color: var(--danger-text);
   font-size: 0.9rem;
+}
+
+/* ================= Toast ================= */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  background: rgba(20, 22, 26, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 16px) scale(0.96);
+  transition: opacity 0.26s var(--ease), transform 0.26s var(--ease);
+}
+
+.toastShow {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.toastIc {
+  font-size: 18px;
+  color: #4fe07f;
 }
 
 /* ================= Responsive ================= */

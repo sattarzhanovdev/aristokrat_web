@@ -1,23 +1,65 @@
 import React from 'react'
 import c from './navbar.module.scss'
-import { LuLock } from 'react-icons/lu'
+import { LuLock, LuHouse } from 'react-icons/lu'
 import { BiUser } from 'react-icons/bi'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import logo from '../../images/logo.svg'
 
 const Navbar = () => {
-  const Navigate = useNavigate()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+
+  let isAdmin = false
+  try {
+    isAdmin = JSON.parse(localStorage.getItem('user'))?.role === 'admin'
+  } catch {}
+
+  const isActive = (p) => pathname === p
 
   return (
-    <div className={c.navbar}>
+    <nav className={c.navbar}>
       <div className={c.container}>
-        <div className={c.block} onClick={() => Navigate('/profile')}>
-          <BiUser />
-        </div>
-        <div className={c.block} onClick={() => Navigate('/admin')}>
-          <LuLock />
+        <button
+          className={c.brand}
+          onClick={() => navigate('/')}
+          aria-label="На главную"
+        >
+          <span className={c.brandLogo}>
+            <img src={logo} alt="Amanat City" />
+          </span>
+        </button>
+
+        <div className={c.actions}>
+          {pathname !== '/' && (
+            <button
+              className={c.block}
+              onClick={() => navigate('/')}
+              aria-label="Главная"
+            >
+              <LuHouse />
+            </button>
+          )}
+
+          <button
+            className={`${c.block} ${isActive('/profile') ? c.active : ''}`}
+            onClick={() => navigate('/profile')}
+            aria-label="Профиль"
+          >
+            <BiUser />
+          </button>
+
+          {isAdmin && (
+            <button
+              className={`${c.block} ${isActive('/admin') ? c.active : ''}`}
+              onClick={() => navigate('/admin')}
+              aria-label="Панель администратора"
+            >
+              <LuLock />
+            </button>
+          )}
         </div>
       </div>
-    </div>
+    </nav>
   )
 }
 

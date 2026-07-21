@@ -7,6 +7,9 @@ import React, {
 } from "react";
 import c from "./main.module.scss";
 import logo from "../../images/logo.svg";
+import { LuDoorOpen, LuCheck } from "react-icons/lu";
+import { MdElevator, MdLocalParking } from "react-icons/md";
+import { TbFence, TbBarrierBlock } from "react-icons/tb";
 
 import api from "../../api";
 
@@ -26,11 +29,20 @@ const rtdbSetBoolean = async (path, value) => {
 
 const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
 
+const greetingByHour = () => {
+  const h = new Date().getHours();
+  if (h < 6) return "Доброй ночи";
+  if (h < 12) return "Доброе утро";
+  if (h < 18) return "Добрый день";
+  return "Добрый вечер";
+};
+
 /* ================================================= */
 export default function Main() {
   const mounted = useRef(false);
   const lastCheckedRef = useRef(0);
   const activeTimersRef = useRef({});
+  const toastTimerRef = useRef(null);
 
   const [user, setUser] = useState(null);
   const [entranceNo, setEntranceNo] = useState(null);
@@ -40,6 +52,15 @@ export default function Main() {
   const [remoteOn, setRemoteOn] = useState({});
   const [busy, setBusy] = useState({});
   const [active, setActive] = useState({});
+  const [toast, setToast] = useState("");
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      if (mounted.current) setToast("");
+    }, 1800);
+  }, []);
 
   const flashActive = useCallback((key, ms = 1000) => {
     setActive((s) => ({ ...s, [key]: true }));
@@ -106,6 +127,7 @@ export default function Main() {
       mounted.current = false;
       Object.values(activeTimersRef.current).forEach((t) => clearTimeout(t));
       activeTimersRef.current = {};
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
       clearInterval(intervalId);
     };
   }, []);
@@ -157,8 +179,12 @@ export default function Main() {
   const pulse = useCallback(
     async (key, path) => {
       flashActive(key, 1000);
-      if (busy[key] || remoteOn[key]) return;
+      if (busy[key] || remoteOn[key]) {
+        showToast("Уже открыто");
+        return;
+      }
 
+      showToast("Сигнал отправлен");
       setBusy((s) => ({ ...s, [key]: true }));
 
       try {
@@ -170,59 +196,97 @@ export default function Main() {
         }, 1200);
       }
     },
-    [busy, remoteOn, flashActive],
+    [busy, remoteOn, flashActive, showToast],
   );
 
-  const cls = (key) => (active[key] ? c.active : "");
+  /* ================= CONTROL RENDERER ================= */
+  const renderControl = ({ icon, label, keyName, path, wide = false }) => {
+    const isActive = !!active[keyName];
+    const isLive = !!remoteOn[keyName];
+    const cn = [
+      wide ? c.wide : c.tile,
+      isActive ? c.active : "",
+      isLive ? c.live : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return (
+      <button
+        key={keyName}
+        className={cn}
+        onClick={() => pulse(keyName, path)}
+        aria-pressed={isActive}
+      >
+        {isActive ? <LuCheck className={c.ic} /> : icon}
+        <span className={c.lbl}>{label}</span>
+        {isActive ? (
+          <span className={c.badgeOpen}>Открыто</span>
+        ) : isLive ? (
+          <span className={c.badgeLive}>
+            <span className={c.dot} />
+            сейчас
+          </span>
+        ) : null}
+      </button>
+    );
+  };
 
   if (loading) return null;
 
-  /* ================= UI (ВЕРСТКА БЕЗ ИЗМЕНЕНИЙ) ================= */
+  const displayName = isAdmin ? "Администратор" : user?.name || "Житель";
+
+  /* ================= UI ================= */
   return (
     <div className={c.main}>
-      <div className={c.logo}>
+      {/* Brand — logo now lives in the navbar */}
+      {/* <div className={c.logo}>
         <img src={logo} alt="logo" />
+      </div> */}
+
+      {/* Greeting */}
+      <div className={c.hello}>
+        <div className={c.helloText}>
+          <span className={c.helloGreet}>{greetingByHour()}</span>
+          <strong className={c.helloName}>{displayName}</strong>
+        </div>
+        <div className={c.chips}>
+          {entranceNo ? <span className={c.chip}>Подъезд {entranceNo}</span> : null}
+          {apartment && apartment !== "10000" && (
+            <span className={c.chip}>Кв. {apartment}</span>
+          )}
+          {isParkingHave && <span className={c.chip}>Паркинг</span>}
+        </div>
       </div>
 
       {isAdmin && (
         <>
-          <h3 className={c.section}>Подъезды (админ)</h3>
+          <h3 className={c.section}>Подъезды · админ</h3>
           <div className={c.grid}>
             {Array.from({ length: 8 }, (_, i) => i + 1).map((no) => (
               <div key={no} className={c.entranceCard}>
                 <div className={c.entranceTitle}>Подъезд №{no}</div>
                 <div className={c.entranceButtons}>
-                  <button
-                    className={cls(`door-${no}`)}
-                    onClick={() =>
-                      pulse(`door-${no}`, `/entrances/${no}/door/value`)
-                    }
-                  >
-                    Дверь
-                  </button>
+                  {renderControl({
+                    icon: <LuDoorOpen className={c.ic} />,
+                    label: "Дверь",
+                    keyName: `door-${no}`,
+                    path: `/entrances/${no}/door/value`,
+                    wide: true,
+                  })}
                   <div className={c.row}>
-                    <button
-                      className={cls(`liftPass-${no}`)}
-                      onClick={() =>
-                        pulse(
-                          `liftPass-${no}`,
-                          `/entrances/${no}/lift_pass/value`,
-                        )
-                      }
-                    >
-                      Лифт (пасс.)
-                    </button>
-                    <button
-                      className={cls(`liftGruz-${no}`)}
-                      onClick={() =>
-                        pulse(
-                          `liftGruz-${no}`,
-                          `/entrances/${no}/lift_gruz/value`,
-                        )
-                      }
-                    >
-                      Лифт (груз.)
-                    </button>
+                    {renderControl({
+                      icon: <MdElevator className={c.ic} />,
+                      label: "Лифт · пасс.",
+                      keyName: `liftPass-${no}`,
+                      path: `/entrances/${no}/lift_pass/value`,
+                    })}
+                    {renderControl({
+                      icon: <MdElevator className={c.ic} />,
+                      label: "Лифт · груз.",
+                      keyName: `liftGruz-${no}`,
+                      path: `/entrances/${no}/lift_gruz/value`,
+                    })}
                   </div>
                 </div>
               </div>
@@ -233,81 +297,82 @@ export default function Main() {
 
       {!isAdmin && entranceNo && apartment !== "10000" && (
         <>
-          <button
-            className={cls(`door-${entranceNo}`)}
-            onClick={() =>
-              pulse(`door-${entranceNo}`, `/entrances/${entranceNo}/door/value`)
-            }
-          >
-            Подъезд №{entranceNo}
-          </button>
+          <h3 className={c.section}>Вход</h3>
+          {renderControl({
+            icon: <LuDoorOpen className={c.ic} />,
+            label: `Подъезд №${entranceNo}`,
+            keyName: `door-${entranceNo}`,
+            path: `/entrances/${entranceNo}/door/value`,
+            wide: true,
+          })}
 
-          <div className={c.elevators}>
-            <button
-              className={cls(`liftPass-${entranceNo}`)}
-              onClick={() =>
-                pulse(
-                  `liftPass-${entranceNo}`,
-                  `/entrances/${entranceNo}/lift_pass/value`,
-                )
-              }
-            >
-              Лифт (пассажир)
-            </button>
-
-            <button
-              className={cls(`liftGruz-${entranceNo}`)}
-              onClick={() =>
-                pulse(
-                  `liftGruz-${entranceNo}`,
-                  `/entrances/${entranceNo}/lift_gruz/value`,
-                )
-              }
-            >
-              Лифт (грузовой)
-            </button>
+          <h3 className={c.section}>Лифты</h3>
+          <div className={c.pair}>
+            {renderControl({
+              icon: <MdElevator className={c.ic} />,
+              label: "Пассажирский",
+              keyName: `liftPass-${entranceNo}`,
+              path: `/entrances/${entranceNo}/lift_pass/value`,
+            })}
+            {renderControl({
+              icon: <MdElevator className={c.ic} />,
+              label: "Грузовой",
+              keyName: `liftGruz-${entranceNo}`,
+              path: `/entrances/${entranceNo}/lift_gruz/value`,
+            })}
           </div>
         </>
       )}
 
       {apartment !== "10000" && (
-        <div className={c.doors}>
-          {[1, 2, 3, 4].map((n) => (
-            <button
-              key={n}
-              className={cls(`kalitka${n}`)}
-              onClick={() => pulse(`kalitka${n}`, `/kalitka${n}/value`)}
-            >
-              Калитка №{n}
-            </button>
-          ))}
-        </div>
+        <>
+          <h3 className={c.section}>Калитки</h3>
+          <div className={c.doors}>
+            {[1, 2, 3, 4].map((n) =>
+              renderControl({
+                icon: <TbFence className={c.ic} />,
+                label: `Калитка №${n}`,
+                keyName: `kalitka${n}`,
+                path: `/kalitka${n}/value`,
+              }),
+            )}
+          </div>
+        </>
       )}
 
       {(isAdmin || isParkingHave) && (
         <>
-          <button
-            className={cls("shlagbaum")}
-            onClick={() => pulse("shlagbaum", "/vorota1/shlagbaum")}
-          >
-            Шлагбаум
-          </button>
+          <h3 className={c.section}>Паркинг</h3>
+          {renderControl({
+            icon: <TbBarrierBlock className={c.ic} />,
+            label: "Шлагбаум",
+            keyName: "shlagbaum",
+            path: "/vorota1/shlagbaum",
+            wide: true,
+          })}
 
-          <button
-            className={cls("parking1")}
-            onClick={() => pulse("parking1", "/vorota1/value")}
-          >
-            Паркинг1
-          </button>
-
-          <button
-            className={cls("parking2")}
-            onClick={() => pulse("parking2", "/vorota2/value")}
-          >
-            Паркинг2
-          </button>
+          <div className={c.pair}>
+            {renderControl({
+              icon: <MdLocalParking className={c.ic} />,
+              label: "Паркинг 1",
+              keyName: "parking1",
+              path: "/vorota1/value",
+            })}
+            {renderControl({
+              icon: <MdLocalParking className={c.ic} />,
+              label: "Паркинг 2",
+              keyName: "parking2",
+              path: "/vorota2/value",
+            })}
+          </div>
         </>
       )}
+
+      {/* Toast */}
+      <div className={`${c.toast} ${toast ? c.toastShow : ""}`} role="status">
+        <LuCheck className={c.toastIc} />
+        {toast}
+      </div>
     </div>
   );
 }
