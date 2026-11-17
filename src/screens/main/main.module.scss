@@ -1,433 +1,383 @@
-/* ================= Main control panel ================= */
-
-.main {
-  width: 100%;
-  max-width: var(--page-max);
-  margin: 0 auto;
-  padding: calc(var(--nav-h) + 24px) clamp(16px, 4vw, 24px)
-    calc(env(safe-area-inset-bottom, 0px) + 64px);
+.page {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
+  gap: 12px;
+  animation: pageIn 0.4s var(--ease);
 }
 
-/* --- Brand logo card --- */
-.logo {
-  width: 100%;
-  height: 132px;
-  background: linear-gradient(135deg, var(--navy-700) 0%, var(--navy-900) 100%);
-  border-radius: var(--r-xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-brand);
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 4px;
-
-  /* subtle sheen */
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(
-      120% 80% at 20% -10%,
-      rgba(255, 255, 255, 0.18),
-      transparent 60%
-    );
-    pointer-events: none;
-  }
-
-  img {
-    height: 62%;
-    max-width: 78%;
-    object-fit: contain;
-    position: relative;
-    z-index: 1;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }
 
 /* --- Greeting --- */
 .hello {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
-  flex-wrap: wrap;
-  padding: 2px 2px 0;
-  margin-top: -2px;
+  padding: 4px 2px 6px;
 }
 
-.helloText {
+.greet {
+  font-size: 14px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.name {
+  font-size: 28px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.chipOk {
+  color: var(--success-text);
+  background: var(--success-bg);
+  border-color: transparent;
+}
+
+.chipWait {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: transparent;
+
+  .statusDot {
+    animation: blink 1.2s ease-in-out infinite;
+  }
+}
+
+/* --- Segmented entrance picker (admin) --- */
+.segment {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+
+  /* на 320px восемь кнопок в ряд становятся по 31px — переносим в 2 ряда по 4 */
+  @media (max-width: 359px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  button {
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 16px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  }
+}
+
+.segActive {
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Section headings --- */
+.section {
+  margin: 14px 4px 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* калитки: 2 колонки на телефоне, 4 на планшете и в альбомной */
+.grid4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 359px) {
+  .grid2 {
+    gap: 8px;
+  }
+}
+
+/* альбомная ориентация телефона: плитки ниже */
+@media (orientation: landscape) and (max-height: 500px) {
+  .hero {
+    min-height: 84px;
+  }
+  .tile {
+    min-height: 96px;
+    gap: 10px;
+  }
+}
+
+/* --- Control buttons --- */
+.control {
+  position: relative;
+  width: 100%;
+  display: flex;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: transform 0.15s var(--ease), box-shadow 0.25s var(--ease),
+    background 0.25s var(--ease), border-color 0.25s var(--ease);
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.iconWrap {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--navy-tint);
+  color: var(--accent);
+  transition: background 0.25s var(--ease), color 0.25s var(--ease),
+    transform 0.35s var(--spring);
+}
+
+.text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
-.helloGreet {
+.label {
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   color: var(--ink-3);
   font-weight: 500;
 }
 
-.helloName {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  line-height: 1.1;
+/* tile — компактная квадратная плитка */
+.tile {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 118px;
+  padding: 14px;
+
+  .iconWrap {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+  }
+  .label {
+    font-size: 16px;
+  }
 }
 
-.chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* wide — во всю ширину, иконка слева */
+.wide {
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  padding: 14px 16px;
+
+  .iconWrap {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+  .label {
+    font-size: 17px;
+  }
 }
 
-.chip {
-  padding: 5px 11px;
-  border-radius: var(--r-pill);
-  background: var(--navy-tint);
-  color: var(--navy-700);
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* --- Section headings --- */
-.section {
-  margin: 14px 2px 2px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-/* --- Base control button (Apple-style tactile tile) --- */
-.main button {
-  width: 100%;
-  min-height: 64px;
-  padding: 16px 20px;
-  background: linear-gradient(180deg, var(--navy-700) 0%, var(--navy-800) 100%);
-  border-radius: var(--r-lg);
+/* hero — главная кнопка подъезда */
+.hero {
+  align-items: center;
+  gap: 16px;
+  min-height: 112px;
+  padding: 18px 20px;
   border: none;
+  background: linear-gradient(140deg, var(--navy-700) 0%, var(--navy-900) 100%);
   color: #fff;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  transition: transform 0.14s var(--ease), box-shadow var(--dur) var(--ease),
-    background var(--dur) var(--ease), filter var(--dur) var(--ease);
+  box-shadow: var(--shadow-brand);
 
-  /* default: icon + label side by side (full-width buttons) */
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  overflow: hidden;
-
-  &:hover {
-    filter: brightness(1.06);
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 90% at 0% 0%, rgba(255, 255, 255, 0.16), transparent 60%);
+    pointer-events: none;
   }
 
-  &:active {
-    transform: scale(0.975);
-    box-shadow: var(--shadow-sm);
+  .iconWrap {
+    width: 64px;
+    height: 64px;
+    font-size: 30px;
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+  .label {
+    font-size: 21px;
+  }
+  .hint {
+    color: rgba(255, 255, 255, 0.72);
   }
 }
 
-.lbl {
-  position: relative;
-  z-index: 1;
+/* --- States --- */
+.st_sending .iconWrap {
+  background: var(--navy-tint);
 }
 
-/* live badge — device is currently open (from Firebase) */
-.badgeLive {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px 3px 7px;
-  border-radius: var(--r-pill);
-  font-size: 11px;
-  font-weight: 600;
-  color: #bff7cf;
-  background: rgba(52, 199, 89, 0.18);
-  border: 1px solid rgba(52, 199, 89, 0.35);
+.st_opened {
+  border-color: transparent;
+  background: var(--success-bg);
+
+  .iconWrap {
+    background: var(--success);
+    color: #fff;
+    transform: scale(1.08);
+  }
+  .hint {
+    color: var(--success-text);
+    font-weight: 650;
+  }
+}
+
+.hero.st_opened {
+  background: linear-gradient(140deg, #22b35e 0%, #128a43 100%);
+
+  .iconWrap {
+    background: rgba(255, 255, 255, 0.22);
+  }
+  .hint {
+    color: #fff;
+  }
+}
+
+.st_error {
+  border-color: transparent;
+  background: var(--danger-bg);
+
+  .iconWrap {
+    background: var(--danger);
+    color: #fff;
+  }
+  .hint {
+    color: var(--danger-text);
+    font-weight: 650;
+  }
+}
+
+.hero.st_error {
+  background: linear-gradient(140deg, #e5484d 0%, #b4232a 100%);
+
+  .hint {
+    color: #fff;
+  }
+}
+
+.isLive {
+  border-color: rgba(31, 168, 85, 0.45);
+
+  .hint {
+    color: var(--success-text);
+  }
+}
+
+.isUnavailable {
+  .iconWrap {
+    background: var(--surface-2);
+    color: var(--ink-3);
+  }
+  .hint {
+    color: var(--warning-text);
+  }
 }
 
 .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #34c759;
-  box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6);
-  animation: blink 1.4s ease-in-out infinite;
+  background: var(--success);
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+.ring {
+  width: 45%;
+  height: 45%;
+  border-radius: 50%;
+  border: 2.5px solid currentColor;
+  border-right-color: transparent;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes blink {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.55);
-  }
   50% {
-    box-shadow: 0 0 0 5px rgba(52, 199, 89, 0);
-  }
-}
-
-/* "Открыто" badge shown during the tap-pulse */
-.badgeOpen {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 3px 9px;
-  border-radius: var(--r-pill);
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.24);
-}
-
-/* subtle ring when a control is live/open */
-.live:not(.active) {
-  box-shadow: var(--shadow-md), inset 0 0 0 1.5px rgba(52, 199, 89, 0.5);
-}
-
-/* icon inside a control */
-.ic {
-  flex-shrink: 0;
-  font-size: 26px;
-  width: 1em;
-  height: 1em;
-}
-
-/* full-width horizontal control (door, shlagbaum, entrance) */
-.wide {
-  .ic {
-    font-size: 24px;
-  }
-}
-
-/* stacked tile: icon on top, label below (grid controls) */
-.tile {
-  flex-direction: column !important;
-  gap: 10px !important;
-  text-align: center;
-  line-height: 1.15;
-
-  .ic {
-    font-size: 32px;
-  }
-}
-
-/* --- Active / "signal sent" pulse --- */
-.active {
-  background: linear-gradient(180deg, #3bd06a 0%, #23a94f 100%) !important;
-  box-shadow: 0 8px 24px rgba(52, 199, 89, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-  animation: pulse 0.9s var(--ease);
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  35% {
-    transform: scale(1.015);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* --- Pair of tall tiles side by side (elevators, parking) --- */
-.pair,
-.elevators {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-
-  button {
-    min-height: 120px;
-    font-size: 15px;
-  }
-}
-
-/* --- Kalitka doors (2×2 grid of tiles) --- */
-.doors {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-
-  button {
-    min-height: 104px;
-    font-size: 15px;
-    padding: 14px 10px;
-  }
-}
-
-/* --- Admin grid of entrances --- */
-.grid {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  .entranceCard {
-    width: 100%;
-    background: var(--surface);
-    border: 1px solid var(--hairline);
-    border-radius: var(--r-lg);
-    box-shadow: var(--shadow-sm);
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .entranceTitle {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--ink);
-    margin: 0;
-  }
-
-  .entranceButtons {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-
-    button:disabled {
-      background: linear-gradient(180deg, #ff5a4f 0%, #e0342a 100%);
-      opacity: 0.9;
-      cursor: not-allowed;
-    }
-
-    .row {
-      width: 100%;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-
-      button {
-        min-height: 100px;
-        font-size: 14px;
-      }
-    }
-  }
-}
-
-/* ================= Password modal ================= */
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.modal {
-  width: min(460px, 100%);
-  background: var(--surface);
-  border-radius: var(--r-lg);
-  padding: 24px;
-  box-shadow: var(--shadow-lg);
-}
-
-.modalDesc {
-  margin: 6px 0 18px;
-  color: var(--ink-2);
-}
-
-.pwdForm {
-  display: grid;
-  gap: 14px;
-
-  label {
-    display: grid;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  input {
-    padding: 12px 14px;
-    border: 1px solid var(--hairline-strong);
-    border-radius: var(--r-sm);
-    font-size: 16px;
-
-    &:focus {
-      outline: none;
-      border-color: var(--navy-600);
-      box-shadow: 0 0 0 4px rgba(0, 52, 99, 0.12);
-    }
-  }
-}
-
-.modalActions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.errorInline {
-  color: var(--danger-text);
-  font-size: 0.9rem;
-}
-
-/* ================= Toast ================= */
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
-  z-index: 200;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-radius: var(--r-pill);
-  background: rgba(20, 22, 26, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: #fff;
-  font-size: 14.5px;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, 16px) scale(0.96);
-  transition: opacity 0.26s var(--ease), transform 0.26s var(--ease);
-}
-
-.toastShow {
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
-}
-
-.toastIc {
-  font-size: 18px;
-  color: #4fe07f;
-}
-
-/* ================= Responsive ================= */
-@media (min-width: 600px) {
-  .doors button {
-    font-size: 14px;
+    opacity: 0.35;
   }
 }

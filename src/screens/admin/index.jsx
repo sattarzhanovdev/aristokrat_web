@@ -1,254 +1,297 @@
-// src/pages/Admin/Admin.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { LuSearch, LuLock, LuLockOpen, LuCircleCheck, LuCircleX, LuRefreshCw, LuPhone, LuUser } from "react-icons/lu";
+import { getApartments, getApartment, setApartmentBlocked, setApartmentApproval } from "../../api";
+import Sheet, { ConfirmSheet } from "../../components/ui/Sheet";
+import { useToast } from "../../components/ui/Toast";
+import { haptic } from "../../lib/native";
+import ui from "../../components/ui/ui.module.scss";
 import c from "./admin.module.scss";
-import { useNavigate } from "react-router-dom";
-import { BiArrowBack } from "react-icons/bi";
-import api, { fetchJson } from "../../api";
 
-const Admin = () => {
-  const navigate = useNavigate();
-  const [buttonClicked, setButtonClicked] = React.useState(false);
-  const [buttonClicked2, setButtonClicked2] = React.useState(false);
+const ENTRANCES = ["all", "1", "2", "3", "4", "5", "6", "7", "8"];
 
-  // === ГАРД ДОСТУПА ===
-  const isAdmin = JSON.parse(localStorage.getItem("user")).role === "admin";
-  useEffect(() => {
-    console.log(isAdmin);
-  }, [navigate]);
+const isBlocked = (a) => !!a && (a.is_blocked === true || a.status === "Заблокирована");
 
-  // === UI state ===
-  const [entrance, setEntrance] = useState("all"); // селект "Выберите подъезд"
-  const [query, setQuery] = useState(""); // поиск
-  const [selectedApartment, setSelectedApartment] = useState(null);
+export default function Admin() {
+  const toast = useToast();
+  const [entrance, setEntrance] = useState("all");
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
 
-  // React.useEffect(() => {
-  //   fetchJson('/api/apartments/').then(data => {
-  //     console.log(data.results);
-  //   })
-  // }, []);
-  // === data state ===
-  const [apartments, setApartments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState([]);
+  const [next, setNext] = useState(null);
+  const [count, setCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState("");
+  const reqId = useRef(0);
 
-  // дебаунс поиска
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [confirm, setConfirm] = useState(null); // 'block' | 'reject'
+
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    const t = setTimeout(() => setSearch(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  // загрузка списка
-  const reloadList = async () => {
-    const params = new URLSearchParams();
-    if (entrance !== "all") params.set("entrance", entrance);
-    if (debouncedQuery) params.set("search", debouncedQuery);
+  const load = useCallback(async () => {
+    const id = ++reqId.current;
+    setLoading(true);
+    setErr("");
+    try {
+      const page = await getApartments({ entrance, search });
+      if (id !== reqId.current) return;
+      setItems(page.items);
+      setNext(page.next);
+      setCount(page.count);
+    } catch (e) {
+      if (id === reqId.current) setErr(e.message);
+    } finally {
+      if (id === reqId.current) setLoading(false);
+    }
+  }, [entrance, search]);
 
-    const data = await fetchJson(`/api/apartments?${params.toString()}`);
-    const list = Array.isArray(data) ? data : data.results || [];
-    setApartments(list);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const loadMore = async () => {
+    if (!next) return;
+    setLoadingMore(true);
+    try {
+      const page = await getApartments({ url: next });
+      setItems((prev) => [...prev, ...page.items]);
+      setNext(page.next);
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
-  useEffect(() => {
-    setTimeout(() => {
-      setButtonClicked(false);
-      setButtonClicked2(false);
-    }, 1000);
-  }, [buttonClicked, buttonClicked2]);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        await reloadList();
-      } catch (e) {
-        if (mounted) setErr(e.message || "Не удалось загрузить квартиры");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entrance, debouncedQuery]);
-
-  // открыть попап
-  const openApartment = async (ap) => {
+  const open = async (ap) => {
+    haptic.tap();
+    setSelected(ap);
+    setDetailLoading(true);
     try {
-      const detail = await fetchJson(`/api/apartments/${ap.id}/`);
-      setSelectedApartment(detail);
+      setSelected(await getApartment(ap.id));
     } catch {
-      setSelectedApartment(ap);
+      /* показываем то, что есть в списке */
+    } finally {
+      setDetailLoading(false);
     }
   };
 
-  // блокировка / разблокировка
-  const toggleBlock = async () => {
-    if (!selectedApartment) return;
+  const patchInList = (updated) =>
+    setItems((prev) => prev.map((a) => (a.id === updated.id ? { ...a, ...updated } : a)));
+
+  const doApproval = async (accept) => {
+    if (!selected) return;
+    setBusy(accept ? "accept" : "reject");
     try {
-      if (
-        selectedApartment.is_blocked ||
-        selectedApartment.status === "Заблокирована"
-      ) {
-        // РАЗБЛОКИРОВАТЬ
-        const updated = await fetchJson(
-          `/api/apartments/${selectedApartment.id}/`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ is_blocked: false }),
-          },
-        );
-        setSelectedApartment(updated);
-      } else {
-        // ЗАБЛОКИРОВАТЬ
-        await fetchJson(`/api/apartments/${selectedApartment.id}/block/`, {
-          method: "PATCH",
-        });
-        const updated = await fetchJson(
-          `/api/apartments/${selectedApartment.id}/`,
-        );
-        setSelectedApartment(updated);
-      }
-      await reloadList();
+      await setApartmentApproval(selected.id, accept);
+      haptic.success();
+      toast(accept ? `Кв. ${selected.number} подтверждена` : `Кв. ${selected.number} отклонена`);
+      setConfirm(null);
     } catch (e) {
-      alert("Не имеете прав для этого действия");
+      haptic.error();
+      toast(e.message, "error");
+    } finally {
+      setBusy("");
     }
   };
 
-  // принять / отклонить квартиру (меняет approval_status у профилей жильцов этой квартиры)
-  const acceptApartment = async (reject = false) => {
-    if (!selectedApartment) return;
+  const doBlock = async () => {
+    if (!selected) return;
+    const block = !isBlocked(selected);
+    setBusy("block");
     try {
-      const url = `/api/apartments/${selectedApartment.id}/${reject ? "reject" : "accept"}/`;
-      const res = await fetchJson(url, { method: "PATCH" });
-      // Можно показать уведомление:
-      // alert(`Обновлено профилей: ${res.updated_profiles}. Статус: ${res.approval_status}`);
-      await reloadList();
+      const updated = await setApartmentBlocked(selected.id, block);
+      setSelected(updated);
+      patchInList(updated);
+      haptic.success();
+      toast(block ? `Кв. ${selected.number} заблокирована` : `Кв. ${selected.number} разблокирована`);
+      setConfirm(null);
     } catch (e) {
-      alert(e?.message || "Не удалось обновить статус одобрения");
+      haptic.error();
+      toast(e.message, "error");
+    } finally {
+      setBusy("");
     }
   };
 
-  // подпись для статуса блокировки
-  const statusLabel = useMemo(() => {
-    if (!selectedApartment) return "";
-    const blocked =
-      selectedApartment.is_blocked ??
-      selectedApartment.status === "Заблокирована";
-    return blocked ? "Заблокирована" : "Активна";
-  }, [selectedApartment]);
-
-  // (access guard removed) render immediately
+  const blocked = isBlocked(selected);
 
   return (
-    <div className={c.admin}>
-      {/* Назад */}
-      <div className={c.back} onClick={() => navigate("/")}>
-        <BiArrowBack />
+    <div className={c.page}>
+      <div className={c.searchBox}>
+        <LuSearch className={c.searchIcon} />
+        <input
+          type="search"
+          inputMode="numeric"
+          enterKeyHint="search"
+          placeholder="Номер квартиры"
+          aria-label="Поиск по номеру квартиры"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
 
-      {/* Поиск */}
-      <input
-        type="text"
-        placeholder="Номер квартиры"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className={c.search}
-      />
+      <div className={c.chips} role="tablist" aria-label="Подъезд">
+        {ENTRANCES.map((e) => (
+          <button
+            key={e}
+            role="tab"
+            aria-selected={entrance === e}
+            className={`${c.chip} ${entrance === e ? c.chipActive : ""}`}
+            onClick={() => {
+              haptic.tap();
+              setEntrance(e);
+            }}
+          >
+            {e === "all" ? "Все" : `Подъезд ${e}`}
+          </button>
+        ))}
+      </div>
 
-      {/* Фильтр по подъезду */}
-      <select
-        value={entrance}
-        onChange={(e) => setEntrance(e.target.value)}
-        className={c.select}
-      >
-        <option value="all">Все подъезды</option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-      </select>
+      <div className={c.meta}>
+        {loading ? "Загрузка…" : err ? "" : `Найдено: ${count}`}
+      </div>
 
-      <h2>Подъезд: {entrance === "all" ? "Все" : entrance}</h2>
-
-      {/* Список/состояния */}
-      {loading && <div className={c.loading}>Загрузка…</div>}
-      {err && <div className={c.error}>{err}</div>}
-
-      <div className={c.apartments}>
-        {!loading &&
-          !err &&
-          apartments.map((ap) => (
-            <button
-              key={ap.id}
-              onClick={() => openApartment(ap)}
-              className={c.apartmentBtn}
-            >
-              {ap.number}
-              {ap.is_blocked ? " 🔒" : ""}
-            </button>
+      {err ? (
+        <div className={c.state}>
+          <p>{err}</p>
+          <button className={`${ui.btn} ${ui.btnGhost}`} onClick={load}>
+            <LuRefreshCw /> Повторить
+          </button>
+        </div>
+      ) : loading ? (
+        <div className={c.grid}>
+          {Array.from({ length: 12 }, (_, i) => (
+            <div key={i} className={c.skeleton} />
           ))}
-        {!loading && !err && apartments.length === 0 && (
-          <div className={c.empty}>Ничего не найдено</div>
-        )}
-      </div>
-
-      {/* Popup */}
-      {selectedApartment && (
-        <div
-          className={c.popupOverlay}
-          onClick={() => setSelectedApartment(null)}
-        >
-          <div className={c.popup} onClick={(e) => e.stopPropagation()}>
-            <h3>Квартира №{selectedApartment.number}</h3>
-            <p>
-              <b>Владелец:</b> {selectedApartment.owner_name || "—"}
-            </p>
-            <p>
-              <b>Номер телефона:</b> {selectedApartment.phone}
-            </p>
-            <p>
-              <b>Статус:</b> {statusLabel}
-            </p>
-
-            <div className={c.rowActions}>
+        </div>
+      ) : items.length === 0 ? (
+        <div className={c.state}>
+          <p>Ничего не найдено</p>
+        </div>
+      ) : (
+        <>
+          <div className={c.grid}>
+            {items.map((ap) => (
               <button
-                className={c.primary}
-                style={buttonClicked ? { background: "#003b00" } : null}
-                onClick={() => {
-                  acceptApartment(false);
-                  setButtonClicked(true);
-                }}
+                key={ap.id}
+                className={`${c.apt} ${isBlocked(ap) ? c.aptBlocked : ""}`}
+                onClick={() => open(ap)}
               >
-                Принять квартиру
+                <span className={c.aptNo}>{ap.number}</span>
+                <span className={c.aptSub}>
+                  {isBlocked(ap) ? (
+                    <>
+                      <LuLock /> Блок
+                    </>
+                  ) : ap.entrance ? (
+                    `Подъезд ${ap.entrance}`
+                  ) : (
+                    "Активна"
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+          {next && (
+            <button className={`${ui.btn} ${ui.btnGhost}`} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? <span className={ui.spinner} /> : "Показать ещё"}
+            </button>
+          )}
+        </>
+      )}
+
+      <Sheet
+        open={!!selected && !confirm}
+        onClose={() => setSelected(null)}
+        title={selected ? `Квартира №${selected.number}` : ""}
+      >
+        {selected && (
+          <>
+            <span className={`${c.status} ${blocked ? c.statusBad : c.statusOk}`}>
+              {blocked ? <LuLock /> : <LuCircleCheck />}
+              {blocked ? "Заблокирована" : "Активна"}
+            </span>
+
+            <div className={c.info}>
+              <div className={c.infoRow}>
+                <LuUser />
+                <span>Владелец</span>
+                <b>{detailLoading ? "…" : selected.owner_name || "—"}</b>
+              </div>
+              <div className={c.infoRow}>
+                <LuPhone />
+                <span>Телефон</span>
+                {selected.phone ? (
+                  <a href={`tel:${selected.phone}`}>{selected.phone}</a>
+                ) : (
+                  <b>{detailLoading ? "…" : "—"}</b>
+                )}
+              </div>
+            </div>
+
+            <div className={c.sectionLabel}>Доступ жильцов</div>
+            <div className={c.actions2}>
+              <button
+                className={`${ui.btn} ${c.btnAccept}`}
+                onClick={() => doApproval(true)}
+                disabled={!!busy}
+              >
+                {busy === "accept" ? <span className={ui.spinner} /> : <><LuCircleCheck /> Принять</>}
               </button>
               <button
-                className={c.secondary}
-                style={buttonClicked2 ? { background: "#a20000" } : null}
-                onClick={() => {
-                  acceptApartment(true);
-                  setButtonClicked2(true);
-                }}
+                className={`${ui.btn} ${c.btnReject}`}
+                onClick={() => setConfirm("reject")}
+                disabled={!!busy}
               >
-                Отклонить
+                <LuCircleX /> Отклонить
               </button>
             </div>
 
-            <button className={c.blockBtn} onClick={toggleBlock}>
-              {statusLabel === "Активна" ? "Заблокировать" : "Разблокировать"}
+            <button
+              className={`${ui.btn} ${blocked ? ui.btnPrimary : c.btnBlock}`}
+              onClick={() => (blocked ? doBlock() : setConfirm("block"))}
+              disabled={!!busy}
+            >
+              {busy === "block" ? (
+                <span className={ui.spinner} />
+              ) : blocked ? (
+                <><LuLockOpen /> Разблокировать</>
+              ) : (
+                <><LuLock /> Заблокировать</>
+              )}
             </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Sheet>
+
+      <ConfirmSheet
+        open={confirm === "block"}
+        title={`Заблокировать кв. ${selected?.number}?`}
+        message="Жильцы этой квартиры не смогут открывать двери, пока вы не разблокируете её."
+        confirmLabel="Заблокировать"
+        danger
+        busy={busy === "block"}
+        onConfirm={doBlock}
+        onClose={() => setConfirm(null)}
+      />
+      <ConfirmSheet
+        open={confirm === "reject"}
+        title={`Отклонить кв. ${selected?.number}?`}
+        message="Профили жильцов этой квартиры потеряют подтверждение."
+        confirmLabel="Отклонить"
+        danger
+        busy={busy === "reject"}
+        onConfirm={() => doApproval(false)}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   );
-};
-
-export default Admin;
+}

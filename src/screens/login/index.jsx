@@ -1,153 +1,134 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { LuEye, LuEyeOff, LuCircleAlert, LuUser, LuKeyRound } from "react-icons/lu";
+import { useAuth } from "../../auth/AuthProvider";
+import { haptic } from "../../lib/native";
+import logo from "../../images/logo.svg";
+import ui from "../../components/ui/ui.module.scss";
 import c from "./login.module.scss";
-
-const API = "https://aristokratamanat.pythonanywhere.com";
-
-// --- helpers ---
-async function postJson(url, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const ct = res.headers.get("content-type") || "";
-  const data = ct.includes("application/json")
-    ? await res.json()
-    : await res.text();
-
-  if (!res.ok) {
-    const msg =
-      typeof data === "object" && data?.message
-        ? data.message
-        : data || res.statusText;
-    const err = new Error(msg);
-    err.status = res.status;
-    throw err;
-  }
-  return data;
-}
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, endedReason } = useAuth();
+  const passRef = useRef(null);
 
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(endedReason || "");
 
-  const canSubmit = login.trim() && password.trim();
-  const storage = remember ? localStorage : sessionStorage;
+  const canSubmit = login.trim() && password && !loading;
 
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!canSubmit) return;
-
     setLoading(true);
     setError("");
-
     try {
-      // === LOGIN ===
-      const data = await postJson(`${API}/api/auth/login/`, {
-        login,
-        password,
-      });
-
-      const user = data.user || data;
-
-      // === ПРОВЕРКИ ===
-      if (user.approval_status === "not_accepted") {
-        throw new Error("Ваш профиль ещё не подтверждён администратором");
-      }
-
-      // === СОХРАНЯЕМ ДАННЫЕ ДЛЯ ПОВТОРНОГО ЛОГИНА ===
-      storage.setItem("login", login);
-      storage.setItem("password", password);
-
-      // === СОХРАНЯЕМ ТОКЕНЫ ЕСЛИ ЕСТЬ ===
-      if (data.accessToken) {
-        storage.setItem("accessToken", data.accessToken);
-      }
-      if (data.refreshToken) {
-        storage.setItem("refreshToken", data.refreshToken);
-      }
-
-      // === СОХРАНЯЕМ ПОЛЬЗОВАТЕЛЯ ===
-      storage.setItem("user", JSON.stringify(user));
-
-      navigate("/", { replace: true });
+      await signIn({ login, password, remember });
+      haptic.success();
+      const to = location.state?.from?.pathname || "/";
+      navigate(to, { replace: true });
     } catch (err) {
-      if (err.status === 400 || err.status === 401) {
-        setError(err.message || "Неверный логин или пароль");
-      } else {
-        setError(err.message || "Не удалось войти. Попробуйте ещё раз.");
-      }
+      haptic.error();
+      setError(
+        err.status === 401 || err.status === 400
+          ? "Неверный логин или пароль"
+          : err.message || "Не удалось войти. Попробуйте ещё раз",
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={c.loginPage}>
-      <div className={c.card}>
-        <div className={c.header}>
-          <h1>Вход</h1>
-          <p>Введите логин и пароль</p>
+    <div className={c.page}>
+      <div className={c.hero}>
+        <div className={c.logo}>
+          <img src={logo} alt="Аристократ" />
         </div>
-
-        <form className={c.form} onSubmit={onSubmit} noValidate>
-          <label className={c.label}>
-            Логин
-            <input
-              className={c.input}
-              type="text"
-              placeholder="001"
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-            />
-          </label>
-
-          <label className={c.label}>
-            Пароль
-            <div className={c.passWrap}>
-              <input
-                className={c.input}
-                type={showPass ? "text" : "password"}
-                placeholder="Пароль"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                className={c.eye}
-                onClick={() => setShowPass((s) => !s)}
-              >
-                {showPass ? "🙈" : "👁️"}
-              </button>
-            </div>
-          </label>
-
-          <div className={c.row}>
-            <label className={c.checkbox}>
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              Запомнить меня
-            </label>
-          </div>
-
-          {error && <div className={c.errorBox}>{error}</div>}
-
-          <button type="submit" className={c.submit} disabled={!canSubmit}>
-            {loading ? "Входим…" : "Войти"}
-          </button>
-        </form>
+        <h1>Добро пожаловать</h1>
+        <p>Войдите, чтобы открывать двери, калитки и шлагбаум</p>
       </div>
+
+      <form className={c.card} onSubmit={onSubmit} noValidate>
+        <label className={c.field}>
+          <LuUser className={c.fieldIcon} />
+          <input
+            type="text"
+            inputMode="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="next"
+            placeholder="Логин"
+            aria-label="Логин"
+            value={login}
+            onChange={(e) => {
+              setLogin(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                passRef.current?.focus();
+              }
+            }}
+          />
+        </label>
+
+        <label className={c.field}>
+          <LuKeyRound className={c.fieldIcon} />
+          <input
+            ref={passRef}
+            type={showPass ? "text" : "password"}
+            autoComplete="current-password"
+            enterKeyHint="go"
+            placeholder="Пароль"
+            aria-label="Пароль"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("");
+            }}
+          />
+          <button
+            type="button"
+            className={c.eye}
+            onClick={() => setShowPass((s) => !s)}
+            aria-label={showPass ? "Скрыть пароль" : "Показать пароль"}
+          >
+            {showPass ? <LuEyeOff /> : <LuEye />}
+          </button>
+        </label>
+
+        <label className={c.remember}>
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          <span className={c.switch} aria-hidden />
+          Оставаться в аккаунте
+        </label>
+
+        {error && (
+          <div className={c.error} role="alert">
+            <LuCircleAlert />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <button type="submit" className={`${ui.btn} ${ui.btnPrimary}`} disabled={!canSubmit}>
+          {loading ? <span className={ui.spinner} /> : "Войти"}
+        </button>
+      </form>
+
+      <p className={c.foot}>Нет доступа? Обратитесь к администратору ЖК</p>
     </div>
   );
 }

@@ -1,75 +1,68 @@
 import React from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { MainRoutes } from "./routes";
-import { Components } from "./components";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./App.scss";
 
-import { getUser, clearUser, isApproved } from "./api";
+import { AuthProvider, useAuth } from "./auth/AuthProvider";
+import { ToastProvider } from "./components/ui/Toast";
+import AppLayout from "./components/layout/AppLayout";
+import Login from "./screens/login";
+import Pending from "./screens/pending";
+import Main from "./screens/main";
+import Profile from "./screens/profile";
+import Admin from "./screens/admin";
 
-/* ================== UTILS ================== */
+function RequireAuth({ children }) {
+  const { signedIn, approved } = useAuth();
+  const location = useLocation();
+  if (!signedIn) return <Navigate to="/login" replace state={{ from: location }} />;
+  if (!approved) return <Pending />;
+  return children;
+}
 
-const PUBLIC_PATHS = new Set([
-  "/login",
-  "/forgot",
-  "/reset",
-]);
+function RequireAdmin({ children }) {
+  const { isAdmin } = useAuth();
+  return isAdmin ? children : <Navigate to="/" replace />;
+}
 
-/* ================== APP ================== */
+function PublicOnly({ children }) {
+  const { signedIn } = useAuth();
+  return signedIn ? <Navigate to="/" replace /> : children;
+}
 
 export default function App() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-
-  const [ready, setReady] = React.useState(false);
-  const ranRef = React.useRef(false); // защита от StrictMode double-run
-
-  React.useEffect(() => {
-    if (ranRef.current) return;
-    ranRef.current = true;
-
-    // ---------- Public routes ----------
-    if (PUBLIC_PATHS.has(pathname)) {
-      setReady(true);
-      ranRef.current = false;
-      return;
-    }
-
-    // ---------- User presence ----------
-    const user = getUser();
-
-    if (!user) {
-      setReady(true);
-      navigate("/login", { replace: true });
-      ranRef.current = false;
-      return;
-    }
-
-    // ---------- Approval check ----------
-    if (!isApproved()) {
-      clearUser();
-      alert("Ваш аккаунт ещё не подтверждён администратором");
-      navigate("/login", { replace: true });
-      ranRef.current = false;
-      return;
-    }
-
-    // ---------- OK ----------
-    setReady(true);
-    ranRef.current = false;
-  }, [pathname, navigate]);
-
-  /* ================== RENDER ================== */
-
-  if (!ready) {
-    return <div style={{ height: "100vh" }} />;
-  }
-
-  const showNavbar = !PUBLIC_PATHS.has(pathname);
-
   return (
-    <div>
-      {showNavbar && <Components.Navbar />}
-      <MainRoutes />
-    </div>
+    <AuthProvider>
+      <ToastProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PublicOnly>
+                <Login />
+              </PublicOnly>
+            }
+          />
+          <Route
+            element={
+              <RequireAuth>
+                <AppLayout />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Main />} />
+            <Route path="profile" element={<Profile />} />
+            <Route
+              path="admin"
+              element={
+                <RequireAdmin>
+                  <Admin />
+                </RequireAdmin>
+              }
+            />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ToastProvider>
+    </AuthProvider>
   );
 }

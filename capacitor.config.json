@@ -1,0 +1,23 @@
+{
+  "appId": "kg.aristokrat.app",
+  "appName": "Аристократ",
+  "webDir": "build",
+  "backgroundColor": "#f3f4f7",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Aristokrat"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#003463",
+      "showSpinner": false
+    }
+  }
+}

@@ -1,115 +1,80 @@
-import { api as axiosApi } from "./axios";
+import { api, toApiError } from "./client";
 
-/* ================== CONFIG ================== */
-export const API_BASE = "https://aristokratamanat.pythonanywhere.com";
-
-/* ================== STORAGE ================== */
-export const getUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem("user"));
-  } catch {
-    return null;
-  }
-};
-
-export const setUser = (user) => {
-  localStorage.setItem("user", JSON.stringify(user));
-};
-
-export const clearUser = () => {
-  localStorage.removeItem("user");
-};
-
-/* ================== AXIOS INSTANCE ================== */
-const api = axiosApi;
-
-/* ================== HELPERS ================== */
-export const fetchJson = async (url, options = {}) => {
-  const res = await api({
-    url,
-    method: options.method || "GET",
-    data: options.body,
-  });
-  return res.data;
-};
+export { api, API_BASE, ApiError, toApiError } from "./client";
 
 /* ================== AUTH ================== */
-export const login = async (login, password) => {
-  const { data } = await api.post("/api/auth/login/", {
-    login,
-    password,
-  });
 
-  setUser(data);
-  return data;
-};
+/**
+ * Логин. Бэкенд не выдаёт токенов — только данные пользователя,
+ * поэтому сессия = сохранённые логин/пароль + кэш пользователя.
+ */
+export async function loginRequest(login, password) {
+  try {
+    const { data } = await api.post("/api/auth/login/", { login, password });
+    return data?.user || data;
+  } catch (e) {
+    throw toApiError(e, "Не удалось войти");
+  }
+}
 
-export const logout = () => {
-  clearUser();
-  window.location.href = "/login";
-};
+/* ================== APARTMENTS (admin) ================== */
 
-/* ================== USER ================== */
-export const getMe = async () => {
-  const user = getUser();
-  if (!user) throw new Error("NOT_AUTHENTICATED");
-  return user;
-};
+export async function getApartments({ entrance, search, url } = {}) {
+  try {
+    if (url) {
+      const { data } = await api.get(url);
+      return normalizePage(data);
+    }
+    const params = {};
+    if (entrance && entrance !== "all") params.entrance = entrance;
+    if (search) params.search = search;
+    const { data } = await api.get("/api/apartments/", { params });
+    return normalizePage(data);
+  } catch (e) {
+    throw toApiError(e, "Не удалось загрузить квартиры");
+  }
+}
 
+function normalizePage(data) {
+  if (Array.isArray(data)) return { items: data, next: null, count: data.length };
+  return {
+    items: data?.results || [],
+    next: data?.next || null,
+    count: data?.count ?? (data?.results || []).length,
+  };
+}
 
-export const isAdmin = () => {
-  const user = getUser();
-  return user?.role === "admin";
-};
+export async function getApartment(id) {
+  try {
+    const { data } = await api.get(`/api/apartments/${id}/`);
+    return data;
+  } catch (e) {
+    throw toApiError(e, "Не удалось загрузить квартиру");
+  }
+}
 
-export const isApproved = () => {
-  const user = getUser();
-  return user?.approval_status === "accepted";
-};
+export async function setApartmentBlocked(id, blocked) {
+  try {
+    if (blocked) {
+      await api.patch(`/api/apartments/${id}/block/`);
+    } else {
+      await api.patch(`/api/apartments/${id}/`, { is_blocked: false });
+    }
+    return getApartment(id);
+  } catch (e) {
+    throw toApiError(e, "Нет прав для этого действия");
+  }
+}
 
-/* ================== DATA ================== */
-export const getApartments = async (params = {}) => {
-  const { data } = await api.get("/api/apartments/", { params });
-  return data;
-};
+export async function setApartmentApproval(id, accept) {
+  try {
+    const { data } = await api.patch(
+      `/api/apartments/${id}/${accept ? "accept" : "reject"}/`,
+    );
+    return data;
+  } catch (e) {
+    throw toApiError(e, "Не удалось обновить статус");
+  }
+}
 
-export const getHouses = async () => {
-  const { data } = await api.get("/api/houses/");
-  return data;
-};
-
-export const getEntrances = async (house) => {
-  const { data } = await api.get("/api/entrances/", {
-    params: { house },
-  });
-  return data;
-};
-
-/* ================== DEVICES ================== */
-export const getEntranceDeviceState = async (entranceNo, kind) => {
-  const { data } = await api.get(
-    `/api/entrances/${entranceNo}/${kind}/`
-  );
-  return data;
-};
-
-export const setEntranceDeviceState = async (entranceNo, kind, state) => {
-  const { data } = await api.post(
-    `/api/entrances/${entranceNo}/${kind}/`,
-    { state }
-  );
-  return data;
-};
-
-export const getGlobalDeviceState = async (kind) => {
-  const { data } = await api.get(`/api/${kind}/`);
-  return data;
-};
-
-export const setGlobalDeviceState = async (kind, state) => {
-  const { data } = await api.post(`/api/${kind}/`, { state });
-  return data;
-};
-
-/* ================== DEFAULT EXPORT ================== */
 export default api;

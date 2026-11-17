@@ -1,117 +1,78 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { LuPhone, LuCar, LuBuilding2, LuDoorOpen, LuHash, LuLogOut, LuShieldCheck } from "react-icons/lu";
+import { useAuth } from "../../auth/AuthProvider";
+import { ConfirmSheet } from "../../components/ui/Sheet";
+import { haptic } from "../../lib/native";
 import c from "./profile.module.scss";
-import { BiArrowBack } from "react-icons/bi";
-import { useNavigate } from "react-router-dom";
-
-import { getUser, clearUser } from "../../api";
 
 export default function Profile() {
-  const navigate = useNavigate();
+  const { user, isAdmin, signOut } = useAuth();
+  const [confirm, setConfirm] = useState(false);
 
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [data, setData] = useState(null);
+  const name = user?.name || user?.login || "Без имени";
+  const apt = user?.apartment_no;
 
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      try {
-        const user = getUser();
-
-        if (!user) {
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        if (!mounted) return;
-
-        setData({
-          name: user.name || user.login || "",
-          phone: user.phone || "",
-          car_number: user.car_number || "",
-          house_number: user.house_number ?? "—",
-          entrance_no: user.entrance_no ?? "—",
-          apartment_no: user.apartment_no || "",
-          status:
-            user.approval_status === "accepted"
-              ? "Активен"
-              : "Не подтверждён",
-        });
-      } catch (e) {
-        if (mounted) setErr("Не удалось загрузить профиль");
-      } finally {
-        mounted && setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [navigate]);
-
-  const logout = () => {
-    clearUser();
-    navigate("/login", { replace: true });
-  };
+  const rows = [
+    { icon: LuPhone, label: "Телефон", value: user?.phone },
+    { icon: LuCar, label: "Автомобиль", value: user?.car_number },
+    { icon: LuBuilding2, label: "Блок / дом", value: user?.house_number },
+    { icon: LuDoorOpen, label: "Подъезд", value: user?.entrance_no },
+    { icon: LuHash, label: "Квартира", value: String(apt) === "10000" ? null : apt },
+  ];
 
   return (
-    <div className={c.profile}>
-      <button
-        className={c.back}
-        onClick={() => navigate("/")}
-        aria-label="Назад"
-      >
-        <BiArrowBack />
-      </button>
-
-      {loading ? (
-        <div className={c.skel}>Загружаем профиль…</div>
-      ) : err ? (
-        <div className={c.error}>{err}</div>
-      ) : (
-        <div className={c.card}>
-          <div className={c.header}>
-            <div className={c.avatar}>
-              {(data.name || "U").slice(0, 1).toUpperCase()}
-            </div>
-            <div className={c.headText}>
-              <h2>{data.name || "Без имени"}</h2>
-              <span
-                className={`${c.badge} ${
-                  data.status === "Активен" ? c.ok : c.block
-                }`}
-              >
-                {data.status}
-              </span>
-            </div>
-          </div>
-
-          <div className={c.info}>
-            <div>
-              <b>Телефон:</b> {data.phone || "—"}
-            </div>
-            <div>
-              <b>Авто:</b> {data.car_number || "—"}
-            </div>
-            <div>
-              <b>Блок / дом:</b> {data.house_number}
-            </div>
-            <div>
-              <b>Подъезд:</b> {data.entrance_no}
-            </div>
-            <div>
-              <b>Квартира:</b> {data.apartment_no || "—"}
-            </div>
-          </div>
-
-          <div className={c.actions}>
-            <button className={c.danger} onClick={logout}>
-              Выйти
-            </button>
-          </div>
+    <div className={c.page}>
+      <section className={c.head}>
+        <div className={c.avatar}>{name.slice(0, 1).toUpperCase()}</div>
+        <h2 className={c.name}>{name}</h2>
+        <div className={c.badges}>
+          <span className={`${c.badge} ${c.ok}`}>Аккаунт активен</span>
+          {isAdmin && (
+            <span className={`${c.badge} ${c.admin}`}>
+              <LuShieldCheck /> Администратор
+            </span>
+          )}
         </div>
-      )}
+      </section>
+
+      <div className={c.group}>
+        {rows.map(({ icon: Icon, label, value }) => (
+          <div key={label} className={c.row}>
+            <span className={c.rowIcon}>
+              <Icon />
+            </span>
+            <span className={c.rowLabel}>{label}</span>
+            <span className={c.rowValue}>{value === null || value === undefined || value === "" ? "—" : value}</span>
+          </div>
+        ))}
+      </div>
+
+      <p className={c.note}>Чтобы изменить данные, обратитесь к администратору ЖК.</p>
+
+      <div className={c.group}>
+        <button
+          className={`${c.row} ${c.rowBtn}`}
+          onClick={() => {
+            haptic.tap();
+            setConfirm(true);
+          }}
+        >
+          <span className={`${c.rowIcon} ${c.rowIconDanger}`}>
+            <LuLogOut />
+          </span>
+          <span className={c.danger}>Выйти из аккаунта</span>
+        </button>
+      </div>
+
+      <ConfirmSheet
+        open={confirm}
+        title="Выйти из аккаунта?"
+        message="Чтобы снова открывать двери, нужно будет ввести логин и пароль."
+        confirmLabel="Выйти"
+        danger
+        onConfirm={() => signOut()}
+        onClose={() => setConfirm(false)}
+      />
     </div>
   );
 }

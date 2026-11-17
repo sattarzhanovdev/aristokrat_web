@@ -1,35 +1,17 @@
-// Main.jsx
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import c from "./main.module.scss";
-import logo from "../../images/logo.svg";
-import { LuDoorOpen, LuCheck } from "react-icons/lu";
+import React, { useState } from "react";
+import { LuDoorOpen, LuCheck, LuCircleAlert, LuFence, LuWifiOff } from "react-icons/lu";
 import { MdElevator, MdLocalParking } from "react-icons/md";
-import { TbFence, TbBarrierBlock } from "react-icons/tb";
+import { TbBarrierBlock } from "react-icons/tb";
+import { useAuth } from "../../auth/AuthProvider";
+import { useToast } from "../../components/ui/Toast";
+import { haptic } from "../../lib/native";
+import { useMqtt, sendRelayPulse, mqttConfigured } from "../../lib/mqtt";
+import { useLiveDevices, usePulse, firebasePulse } from "./useDevices";
+import c from "./main.module.scss";
 
-import api from "../../api";
+const ENTRANCES = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/* ================= Firebase ================= */
-const DB_URL =
-  "https://aristokrat-aa238-default-rtdb.asia-southeast1.firebasedatabase.app";
-
-const toUrl = (path) => `${DB_URL}${path}.json`;
-
-const rtdbSetBoolean = async (path, value) => {
-  await fetch(toUrl(path), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(!!value),
-  });
-};
-
-const toBool = (v) => v === true || v === "true" || v === 1 || v === "1";
-
-const greetingByHour = () => {
+const greeting = () => {
   const h = new Date().getHours();
   if (h < 6) return "Доброй ночи";
   if (h < 12) return "Доброе утро";
@@ -37,342 +19,228 @@ const greetingByHour = () => {
   return "Добрый вечер";
 };
 
-/* ================================================= */
-export default function Main() {
-  const mounted = useRef(false);
-  const lastCheckedRef = useRef(0);
-  const activeTimersRef = useRef({});
-  const toastTimerRef = useRef(null);
+function Control({ icon: Icon, label, keyName, send, variant = "tile", live, status, onPress, unavailable }) {
+  const st = status[keyName];
+  const isLive = !!live[keyName];
 
-  const [user, setUser] = useState(null);
-  const [entranceNo, setEntranceNo] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const hint =
+    st === "sending"
+      ? "Отправляем…"
+      : st === "opened"
+        ? "Открыто"
+        : st === "error"
+          ? "Ошибка, повторите"
+          : unavailable
+            ? unavailable
+            : isLive
+              ? "Сейчас открыто"
+              : "Нажмите, чтобы открыть";
 
-  const [remoteOn, setRemoteOn] = useState({});
-  const [busy, setBusy] = useState({});
-  const [active, setActive] = useState({});
-  const [toast, setToast] = useState("");
+  const StateIcon =
+    st === "opened" ? LuCheck : st === "error" ? LuCircleAlert : unavailable ? LuWifiOff : Icon;
 
-  const showToast = useCallback((msg) => {
-    setToast(msg);
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => {
-      if (mounted.current) setToast("");
-    }, 1800);
-  }, []);
-
-  const flashActive = useCallback((key, ms = 1000) => {
-    setActive((s) => ({ ...s, [key]: true }));
-
-    const prevTimer = activeTimersRef.current[key];
-    if (prevTimer) clearTimeout(prevTimer);
-
-    activeTimersRef.current[key] = setTimeout(() => {
-      if (!mounted.current) return;
-      setActive((s) => ({ ...s, [key]: false }));
-      delete activeTimersRef.current[key];
-    }, ms);
-  }, []);
-
-  /* ================= LOGIN EVERY TIME ================= */
-  useEffect(() => {
-    mounted.current = true;
-
-    const checkAuth = async () => {
-      const now = Date.now();
-      if (now - lastCheckedRef.current < 30000) return; // check every 30 sec
-
-      try {
-        const login =
-          localStorage.getItem("login") || sessionStorage.getItem("login");
-        const password =
-          localStorage.getItem("password") || sessionStorage.getItem("password");
-
-        if (!login || !password) {
-          if (mounted.current) setLoading(false);
-          window.location.href = "/login";
-          return;
-        }
-
-        const { data } = await api.post("/api/auth/login/", {
-          login,
-          password,
-        });
-
-        if (!mounted.current) return;
-
-        if (data.approval_status !== "accepted") {
-          alert("Ваш аккаунт ещё не одобрен администратором");
-          setLoading(false);
-          window.location.href = "/login";
-          return;
-        }
-
-        setUser(data);
-        setIsAdmin(data.role === "admin");
-        setEntranceNo(data.entrance_no ?? null);
-        lastCheckedRef.current = now;
-        setLoading(false);
-      } catch (e) {
-        if (mounted.current) setLoading(false);
-        window.location.href = "/login";
-      }
-    };
-
-    checkAuth();
-    const intervalId = setInterval(checkAuth, 5000);
-
-    return () => {
-      mounted.current = false;
-      Object.values(activeTimersRef.current).forEach((t) => clearTimeout(t));
-      activeTimersRef.current = {};
-      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-      clearInterval(intervalId);
-    };
-  }, []);
-
-  /* ================= FIREBASE ================= */
-  useEffect(() => {
-    if (loading || !user) return;
-
-    const es = new EventSource(toUrl("/"));
-
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data) || {};
-        const next = {};
-
-        Object.entries(data.entrances || {}).forEach(([no, e]) => {
-          next[`door-${no}`] = toBool(e?.door?.value);
-          next[`liftPass-${no}`] = toBool(e?.lift_pass?.value);
-          next[`liftGruz-${no}`] = toBool(e?.lift_gruz?.value);
-        });
-
-        [1, 2, 3, 4].forEach((n) => {
-          if (data[`kalitka${n}`]?.value !== undefined) {
-            next[`kalitka${n}`] = toBool(data[`kalitka${n}`].value);
-          }
-        });
-
-        if (data.vorota1) {
-          next.parking1 = toBool(data.vorota1.value);
-          next.shlagbaum = toBool(data.vorota1.shlagbaum);
-        }
-        if (data.vorota2) {
-          next.parking2 = toBool(data.vorota2.value);
-        }
-
-        mounted.current && setRemoteOn((prev) => ({ ...prev, ...next }));
-      } catch {}
-    };
-
-    es.onerror = () => es.close();
-    return () => es.close();
-  }, [loading, user]);
-
-  /* ================= PARKING ================= */
-  const apartment = user?.apartment_no ?? null;
-  const isParkingHave = !!user?.has_parking;
-
-  /* ================= ACTION ================= */
-  const pulse = useCallback(
-    async (key, path) => {
-      flashActive(key, 1000);
-      if (busy[key] || remoteOn[key]) {
-        showToast("Уже открыто");
-        return;
-      }
-
-      showToast("Сигнал отправлен");
-      setBusy((s) => ({ ...s, [key]: true }));
-
-      try {
-        await rtdbSetBoolean(path, true);
-        setTimeout(() => rtdbSetBoolean(path, false), 1000);
-      } finally {
-        setTimeout(() => {
-          setBusy((s) => ({ ...s, [key]: false }));
-        }, 1200);
-      }
-    },
-    [busy, remoteOn, flashActive, showToast],
+  return (
+    <button
+      type="button"
+      className={[
+        c.control,
+        c[variant],
+        st ? c[`st_${st}`] : "",
+        isLive && !st ? c.isLive : "",
+        unavailable && !st ? c.isUnavailable : "",
+      ].join(" ")}
+      onClick={() => onPress(keyName, label, send)}
+      disabled={st === "sending"}
+      aria-label={`${label}: ${hint}`}
+    >
+      <span className={c.iconWrap}>
+        {st === "sending" ? <span className={c.ring} /> : <StateIcon />}
+      </span>
+      <span className={c.text}>
+        <span className={c.label}>{label}</span>
+        <span className={c.hint}>
+          {isLive && !st && !unavailable && <span className={c.dot} />}
+          {hint}
+        </span>
+      </span>
+    </button>
   );
+}
 
-  /* ================= CONTROL RENDERER ================= */
-  const renderControl = ({ icon, label, keyName, path, wide = false }) => {
-    const isActive = !!active[keyName];
-    const isLive = !!remoteOn[keyName];
-    const cn = [
-      wide ? c.wide : c.tile,
-      isActive ? c.active : "",
-      isLive ? c.live : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+export default function Main() {
+  const { user, isAdmin } = useAuth();
+  const toast = useToast();
+  const { live: fbLive, connected } = useLiveDevices(true);
+  const { status, run } = usePulse();
 
-    return (
-      <button
-        key={keyName}
-        className={cn}
-        onClick={() => pulse(keyName, path)}
-        aria-pressed={isActive}
-      >
-        {isActive ? <LuCheck className={c.ic} /> : icon}
-        <span className={c.lbl}>{label}</span>
-        {isActive ? (
-          <span className={c.badgeOpen}>Открыто</span>
-        ) : isLive ? (
-          <span className={c.badgeLive}>
-            <span className={c.dot} />
-            сейчас
-          </span>
-        ) : null}
-      </button>
-    );
+  const ownEntrance = user?.entrance_no ?? null;
+  const apartment = user?.apartment_no ?? null;
+  const isService = String(apartment) === "10000";
+  const hasParking = !!user?.has_parking;
+  const showParking = isAdmin || hasParking;
+  const [adminEntrance, setAdminEntrance] = useState(ownEntrance || 1);
+
+  const mq = useMqtt(showParking);
+  const entrance = isAdmin ? adminEntrance : ownEntrance;
+
+  // живое состояние: двери/калитки из Firebase, паркинг из MQTT
+  const live = {
+    ...fbLive,
+    shlagbaum: !!mq.relays["parking1/barrier"],
+    parking1: !!mq.relays["parking1/gate"],
+    parking2: !!mq.relays["parking2/gate"],
   };
 
-  if (loading) return null;
+  const parkingUnavailable = (device) => {
+    if (!mqttConfigured) return "Не настроено";
+    if (!mq.connected) return "Подключение…";
+    // нет статуса = контроллер ни разу не подключался к брокеру
+    if (mq.devices[device] !== "online") return "Не в сети";
+    return null;
+  };
 
-  const displayName = isAdmin ? "Администратор" : user?.name || "Житель";
+  const onPress = async (key, label, send) => {
+    if (status[key] === "sending") return;
+    haptic.tap();
+    if (live[key]) {
+      toast(`${label}: уже открыто`, "info");
+      return;
+    }
+    const res = await run(key, send);
+    if (res.ok) {
+      haptic.success();
+      toast(`${label} — открыто`, "success");
+    } else {
+      haptic.error();
+      toast(res.error, "error", 3000);
+    }
+  };
 
-  /* ================= UI ================= */
+  const fb = (path) => () => firebasePulse(path);
+  const relay = (device, name) => () => sendRelayPulse(device, name);
+  const ctl = { live, status, onPress };
+  const name = isAdmin ? "Администратор" : user?.name || "Житель";
+
   return (
-    <div className={c.main}>
-      {/* Brand — logo now lives in the navbar */}
-      {/* <div className={c.logo}>
-        <img src={logo} alt="logo" />
-      </div> */}
-
-      {/* Greeting */}
-      <div className={c.hello}>
-        <div className={c.helloText}>
-          <span className={c.helloGreet}>{greetingByHour()}</span>
-          <strong className={c.helloName}>{displayName}</strong>
+    <div className={c.page}>
+      <section className={c.hello}>
+        <div>
+          <div className={c.greet}>{greeting()}</div>
+          <div className={c.name}>{name}</div>
         </div>
         <div className={c.chips}>
-          {entranceNo ? <span className={c.chip}>Подъезд {entranceNo}</span> : null}
-          {apartment && apartment !== "10000" && (
-            <span className={c.chip}>Кв. {apartment}</span>
-          )}
-          {isParkingHave && <span className={c.chip}>Паркинг</span>}
+          {!isAdmin && ownEntrance && <span className={c.chip}>Подъезд {ownEntrance}</span>}
+          {!isAdmin && apartment && !isService && <span className={c.chip}>Кв. {apartment}</span>}
+          {hasParking && <span className={c.chip}>Паркинг</span>}
+          <span className={`${c.chip} ${connected ? c.chipOk : c.chipWait}`}>
+            <span className={c.statusDot} />
+            {connected ? "На связи" : "Подключение…"}
+          </span>
         </div>
-      </div>
+      </section>
 
       {isAdmin && (
+        <div className={c.segment} role="tablist" aria-label="Подъезд">
+          {ENTRANCES.map((no) => (
+            <button
+              key={no}
+              role="tab"
+              aria-selected={adminEntrance === no}
+              className={adminEntrance === no ? c.segActive : ""}
+              onClick={() => {
+                haptic.tap();
+                setAdminEntrance(no);
+              }}
+            >
+              {no}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {entrance && !isService && (
         <>
-          <h3 className={c.section}>Подъезды · админ</h3>
-          <div className={c.grid}>
-            {Array.from({ length: 8 }, (_, i) => i + 1).map((no) => (
-              <div key={no} className={c.entranceCard}>
-                <div className={c.entranceTitle}>Подъезд №{no}</div>
-                <div className={c.entranceButtons}>
-                  {renderControl({
-                    icon: <LuDoorOpen className={c.ic} />,
-                    label: "Дверь",
-                    keyName: `door-${no}`,
-                    path: `/entrances/${no}/door/value`,
-                    wide: true,
-                  })}
-                  <div className={c.row}>
-                    {renderControl({
-                      icon: <MdElevator className={c.ic} />,
-                      label: "Лифт · пасс.",
-                      keyName: `liftPass-${no}`,
-                      path: `/entrances/${no}/lift_pass/value`,
-                    })}
-                    {renderControl({
-                      icon: <MdElevator className={c.ic} />,
-                      label: "Лифт · груз.",
-                      keyName: `liftGruz-${no}`,
-                      path: `/entrances/${no}/lift_gruz/value`,
-                    })}
-                  </div>
-                </div>
-              </div>
+          <Control
+            {...ctl}
+            variant="hero"
+            icon={LuDoorOpen}
+            label={`Подъезд №${entrance}`}
+            keyName={`door-${entrance}`}
+            send={fb(`/entrances/${entrance}/door/value`)}
+          />
+
+          <h2 className={c.section}>Лифты</h2>
+          <div className={c.grid2}>
+            <Control
+              {...ctl}
+              icon={MdElevator}
+              label="Пассажирский"
+              keyName={`liftPass-${entrance}`}
+              send={fb(`/entrances/${entrance}/lift_pass/value`)}
+            />
+            <Control
+              {...ctl}
+              icon={MdElevator}
+              label="Грузовой"
+              keyName={`liftGruz-${entrance}`}
+              send={fb(`/entrances/${entrance}/lift_gruz/value`)}
+            />
+          </div>
+        </>
+      )}
+
+      {!isService && (
+        <>
+          <h2 className={c.section}>Калитки</h2>
+          <div className={c.grid4}>
+            {[1, 2, 3, 4].map((n) => (
+              <Control
+                key={n}
+                {...ctl}
+                icon={LuFence}
+                label={`Калитка №${n}`}
+                keyName={`kalitka${n}`}
+                send={fb(`/kalitka${n}/value`)}
+              />
             ))}
           </div>
         </>
       )}
 
-      {!isAdmin && entranceNo && apartment !== "10000" && (
+      {showParking && (
         <>
-          <h3 className={c.section}>Вход</h3>
-          {renderControl({
-            icon: <LuDoorOpen className={c.ic} />,
-            label: `Подъезд №${entranceNo}`,
-            keyName: `door-${entranceNo}`,
-            path: `/entrances/${entranceNo}/door/value`,
-            wide: true,
-          })}
-
-          <h3 className={c.section}>Лифты</h3>
-          <div className={c.pair}>
-            {renderControl({
-              icon: <MdElevator className={c.ic} />,
-              label: "Пассажирский",
-              keyName: `liftPass-${entranceNo}`,
-              path: `/entrances/${entranceNo}/lift_pass/value`,
-            })}
-            {renderControl({
-              icon: <MdElevator className={c.ic} />,
-              label: "Грузовой",
-              keyName: `liftGruz-${entranceNo}`,
-              path: `/entrances/${entranceNo}/lift_gruz/value`,
-            })}
+          <h2 className={c.section}>Паркинг 1</h2>
+          <div className={c.grid2}>
+            <Control
+              {...ctl}
+              icon={TbBarrierBlock}
+              label="Шлагбаум"
+              keyName="shlagbaum"
+              send={relay("parking1", "barrier")}
+              unavailable={parkingUnavailable("parking1")}
+            />
+            <Control
+              {...ctl}
+              icon={MdLocalParking}
+              label="Ворота"
+              keyName="parking1"
+              send={relay("parking1", "gate")}
+              unavailable={parkingUnavailable("parking1")}
+            />
           </div>
+
+          <h2 className={c.section}>Паркинг 2</h2>
+          <Control
+            {...ctl}
+            variant="wide"
+            icon={MdLocalParking}
+            label="Ворота паркинга 2"
+            keyName="parking2"
+            send={relay("parking2", "gate")}
+            unavailable={parkingUnavailable("parking2")}
+          />
         </>
       )}
-
-      {apartment !== "10000" && (
-        <>
-          <h3 className={c.section}>Калитки</h3>
-          <div className={c.doors}>
-            {[1, 2, 3, 4].map((n) =>
-              renderControl({
-                icon: <TbFence className={c.ic} />,
-                label: `Калитка №${n}`,
-                keyName: `kalitka${n}`,
-                path: `/kalitka${n}/value`,
-              }),
-            )}
-          </div>
-        </>
-      )}
-
-      {(isAdmin || isParkingHave) && (
-        <>
-          <h3 className={c.section}>Паркинг</h3>
-          {renderControl({
-            icon: <TbBarrierBlock className={c.ic} />,
-            label: "Шлагбаум",
-            keyName: "shlagbaum",
-            path: "/vorota1/shlagbaum",
-            wide: true,
-          })}
-
-          <div className={c.pair}>
-            {renderControl({
-              icon: <MdLocalParking className={c.ic} />,
-              label: "Паркинг 1",
-              keyName: "parking1",
-              path: "/vorota1/value",
-            })}
-            {renderControl({
-              icon: <MdLocalParking className={c.ic} />,
-              label: "Паркинг 2",
-              keyName: "parking2",
-              path: "/vorota2/value",
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Toast */}
-      <div className={`${c.toast} ${toast ? c.toastShow : ""}`} role="status">
-        <LuCheck className={c.toastIc} />
-        {toast}
-      </div>
     </div>
   );
 }

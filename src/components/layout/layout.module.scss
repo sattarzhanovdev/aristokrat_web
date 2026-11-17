@@ -1,0 +1,154 @@
+.shell {
+  min-height: 100dvh;
+}
+
+/* --- Top bar --- */
+.top {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding-top: var(--safe-top);
+  background: var(--glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.topInner {
+  height: var(--top-h);
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand {
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, var(--navy-700), var(--navy-900));
+  flex-shrink: 0;
+
+  img {
+    height: 18px;
+    display: block;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.offline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+/* --- Content --- */
+.content {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + var(--top-h) + 16px) var(--gutter)
+    calc(var(--safe-bottom) + var(--tab-h) + 28px);
+}
+
+.contentOffline {
+  padding-top: calc(var(--safe-top) + var(--top-h) + 30px + 16px);
+}
+
+/* --- Bottom tab bar --- */
+.tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px calc(var(--safe-bottom) + 6px);
+  background: var(--glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--hairline);
+}
+
+.tab {
+  flex: 1;
+  max-width: 160px;
+  height: calc(var(--tab-h) - 12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 14px;
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+
+  &:active {
+    background: var(--surface-2);
+  }
+}
+
+.tabIcon {
+  font-size: 23px;
+  transition: transform 0.3s var(--spring);
+}
+
+/* альбомная ориентация: иконка и подпись в строку, панель ниже */
+@media (orientation: landscape) and (max-height: 500px) {
+  .tabs {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  .tab {
+    flex-direction: row;
+    gap: 8px;
+    font-size: 13px;
+    max-width: 200px;
+  }
+  .tabIcon {
+    font-size: 20px;
+  }
+  .brand {
+    height: 30px;
+  }
+}
+
+/* боковые вырезы (iPhone в альбомной) */
+.topInner,
+.content {
+  padding-left: max(var(--gutter), env(safe-area-inset-left));
+  padding-right: max(var(--gutter), env(safe-area-inset-right));
+}
+
+.tabActive {
+  color: var(--accent);
+
+  .tabIcon {
+    transform: translateY(-1px) scale(1.06);
+  }
+}
