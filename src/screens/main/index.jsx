@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { LuCheck, LuCircleAlert, LuLock, LuWifiOff } from "react-icons/lu";
 import { MdLocalParking } from "react-icons/md";
-import { TbBarrierBlock } from "react-icons/tb";
+import BarrierIcon from "../../components/ui/BarrierIcon";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../../components/ui/Toast";
 import { haptic } from "../../lib/native";
@@ -9,7 +9,7 @@ import { useMqtt, sendRelayPulse, publishLock, mqttConfigured } from "../../lib/
 import { usePulse } from "./useDevices";
 import c from "./main.module.scss";
 
-// после открытия ворота паркинга 2 блокируются для всех на это время
+// после открытия паркинга 2 кнопка блокируются для всех на это время
 const PARKING2_LOCK_MS = 20000;
 
 const greeting = () => {
@@ -186,7 +186,7 @@ export default function Main() {
             <div className={c.row}>
               <Control
                 {...ctl}
-                icon={TbBarrierBlock}
+                icon={BarrierIcon}
                 label="Шлагбаум"
                 keyName="shlagbaum"
                 send={relay("parking1", "barrier")}
@@ -195,7 +195,7 @@ export default function Main() {
               <Control
                 {...ctl}
                 icon={MdLocalParking}
-                label="Ворота"
+                label="Паркинг"
                 keyName="parking1"
                 send={relay("parking1", "gate")}
                 unavailable={parkingUnavailable("parking1")}
@@ -212,7 +212,7 @@ export default function Main() {
               <Control
                 {...ctl}
                 icon={MdLocalParking}
-                label="Ворота"
+                label="Паркинг"
                 keyName="parking2"
                 send={async () => {
                   await sendRelayPulse("parking2", "gate");

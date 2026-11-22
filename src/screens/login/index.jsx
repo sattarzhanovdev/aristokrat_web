@@ -51,7 +51,7 @@ export default function Login() {
           <img src={logo} alt="Аристократ" />
         </div>
         <h1>Добро пожаловать</h1>
-        <p>Войдите, чтобы открывать шлагбаум и ворота паркинга</p>
+        <p>Войдите, чтобы открывать шлагбаум и паркинг</p>
       </div>
 
       <form className={c.card} onSubmit={onSubmit} noValidate>
