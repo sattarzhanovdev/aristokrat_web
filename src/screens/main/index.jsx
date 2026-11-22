@@ -1,15 +1,16 @@
-import React, { useState } from "react";
-import { LuDoorOpen, LuCheck, LuCircleAlert, LuFence, LuWifiOff } from "react-icons/lu";
-import { MdElevator, MdLocalParking } from "react-icons/md";
+import React, { useEffect, useState } from "react";
+import { LuCheck, LuCircleAlert, LuLock, LuWifiOff } from "react-icons/lu";
+import { MdLocalParking } from "react-icons/md";
 import { TbBarrierBlock } from "react-icons/tb";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../../components/ui/Toast";
 import { haptic } from "../../lib/native";
-import { useMqtt, sendRelayPulse, mqttConfigured } from "../../lib/mqtt";
-import { useLiveDevices, usePulse, firebasePulse } from "./useDevices";
+import { useMqtt, sendRelayPulse, publishLock, mqttConfigured } from "../../lib/mqtt";
+import { usePulse } from "./useDevices";
 import c from "./main.module.scss";
 
-const ENTRANCES = [1, 2, 3, 4, 5, 6, 7, 8];
+// после открытия ворота паркинга 2 блокируются для всех на это время
+const PARKING2_LOCK_MS = 20000;
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -19,9 +20,11 @@ const greeting = () => {
   return "Добрый вечер";
 };
 
-function Control({ icon: Icon, label, keyName, send, variant = "tile", live, status, onPress, unavailable }) {
+function Control({ icon: Icon, label, keyName, send, live, status, onPress, unavailable, lockLeft = 0, lockTotal = 1 }) {
   const st = status[keyName];
   const isLive = !!live[keyName];
+  const lockSec = Math.ceil(lockLeft / 1000);
+  const isLocked = lockLeft > 0 && !st;
 
   const hint =
     st === "sending"
@@ -30,11 +33,13 @@ function Control({ icon: Icon, label, keyName, send, variant = "tile", live, sta
         ? "Открыто"
         : st === "error"
           ? "Ошибка, повторите"
-          : unavailable
-            ? unavailable
-            : isLive
-              ? "Сейчас открыто"
-              : "Нажмите, чтобы открыть";
+          : isLocked
+            ? `Снова через ${lockSec} с`
+            : unavailable
+              ? unavailable
+              : isLive
+                ? "Сейчас открыто"
+                : "Открыть";
 
   const StateIcon =
     st === "opened" ? LuCheck : st === "error" ? LuCircleAlert : unavailable ? LuWifiOff : Icon;
@@ -44,22 +49,32 @@ function Control({ icon: Icon, label, keyName, send, variant = "tile", live, sta
       type="button"
       className={[
         c.control,
-        c[variant],
         st ? c[`st_${st}`] : "",
         isLive && !st ? c.isLive : "",
-        unavailable && !st ? c.isUnavailable : "",
+        unavailable && !st && !isLocked ? c.isUnavailable : "",
+        isLocked ? c.isLocked : "",
       ].join(" ")}
+      style={isLocked ? { "--p": lockLeft / lockTotal } : undefined}
       onClick={() => onPress(keyName, label, send)}
       disabled={st === "sending"}
       aria-label={`${label}: ${hint}`}
     >
-      <span className={c.iconWrap}>
-        {st === "sending" ? <span className={c.ring} /> : <StateIcon />}
+      <span className={c.orb}>
+        {st === "sending" ? (
+          <span className={c.ring} />
+        ) : isLocked ? (
+          <span className={c.count}>
+            <LuLock />
+            {lockSec}
+          </span>
+        ) : (
+          <StateIcon />
+        )}
       </span>
       <span className={c.text}>
         <span className={c.label}>{label}</span>
         <span className={c.hint}>
-          {isLive && !st && !unavailable && <span className={c.dot} />}
+          {isLive && !st && !unavailable && !isLocked && <span className={c.dot} />}
           {hint}
         </span>
       </span>
@@ -70,22 +85,31 @@ function Control({ icon: Icon, label, keyName, send, variant = "tile", live, sta
 export default function Main() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
-  const { live: fbLive, connected } = useLiveDevices(true);
   const { status, run } = usePulse();
 
-  const ownEntrance = user?.entrance_no ?? null;
   const apartment = user?.apartment_no ?? null;
   const isService = String(apartment) === "10000";
   const hasParking = !!user?.has_parking;
   const showParking = isAdmin || hasParking;
-  const [adminEntrance, setAdminEntrance] = useState(ownEntrance || 1);
 
   const mq = useMqtt(showParking);
-  const entrance = isAdmin ? adminEntrance : ownEntrance;
 
-  // живое состояние: двери/калитки из Firebase, паркинг из MQTT
+  // блокировка паркинга 2: перерисовываемся, пока идёт отсчёт
+  const lock2Until = mq.locks["parking2/gate"] || 0;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (lock2Until <= Date.now()) return;
+    const t = setInterval(() => {
+      tick((n) => n + 1);
+      if (Date.now() >= lock2Until) clearInterval(t);
+    }, 250);
+    return () => clearInterval(t);
+  }, [lock2Until]);
+  // ограничиваем сверху: у телефона могут спешить часы
+  const lock2Left = Math.min(PARKING2_LOCK_MS, Math.max(0, lock2Until - Date.now()));
+
+  // живое состояние паркинга из MQTT
   const live = {
-    ...fbLive,
     shlagbaum: !!mq.relays["parking1/barrier"],
     parking1: !!mq.relays["parking1/gate"],
     parking2: !!mq.relays["parking2/gate"],
@@ -99,9 +123,16 @@ export default function Main() {
     return null;
   };
 
+  const lockLeftFor = (key) => (key === "parking2" ? lock2Left : 0);
+
   const onPress = async (key, label, send) => {
     if (status[key] === "sending") return;
     haptic.tap();
+    const left = lockLeftFor(key);
+    if (left > 0) {
+      toast(`${label}: снова можно через ${Math.ceil(left / 1000)} с`, "info");
+      return;
+    }
     if (live[key]) {
       toast(`${label}: уже открыто`, "info");
       return;
@@ -116,7 +147,6 @@ export default function Main() {
     }
   };
 
-  const fb = (path) => () => firebasePulse(path);
   const relay = (device, name) => () => sendRelayPulse(device, name);
   const ctl = { live, status, onPress };
   const name = isAdmin ? "Администратор" : user?.name || "Житель";
@@ -129,116 +159,71 @@ export default function Main() {
           <div className={c.name}>{name}</div>
         </div>
         <div className={c.chips}>
-          {!isAdmin && ownEntrance && <span className={c.chip}>Подъезд {ownEntrance}</span>}
           {!isAdmin && apartment && !isService && <span className={c.chip}>Кв. {apartment}</span>}
           {hasParking && <span className={c.chip}>Паркинг</span>}
-          <span className={`${c.chip} ${connected ? c.chipOk : c.chipWait}`}>
-            <span className={c.statusDot} />
-            {connected ? "На связи" : "Подключение…"}
-          </span>
+          {showParking && (
+            <span className={`${c.chip} ${mq.connected ? c.chipOk : c.chipWait}`}>
+              <span className={c.statusDot} />
+              {mq.connected ? "На связи" : "Подключение…"}
+            </span>
+          )}
         </div>
       </section>
 
-      {isAdmin && (
-        <div className={c.segment} role="tablist" aria-label="Подъезд">
-          {ENTRANCES.map((no) => (
-            <button
-              key={no}
-              role="tab"
-              aria-selected={adminEntrance === no}
-              className={adminEntrance === no ? c.segActive : ""}
-              onClick={() => {
-                haptic.tap();
-                setAdminEntrance(no);
-              }}
-            >
-              {no}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {entrance && !isService && (
-        <>
-          <Control
-            {...ctl}
-            variant="hero"
-            icon={LuDoorOpen}
-            label={`Подъезд №${entrance}`}
-            keyName={`door-${entrance}`}
-            send={fb(`/entrances/${entrance}/door/value`)}
-          />
-
-          <h2 className={c.section}>Лифты</h2>
-          <div className={c.grid2}>
-            <Control
-              {...ctl}
-              icon={MdElevator}
-              label="Пассажирский"
-              keyName={`liftPass-${entrance}`}
-              send={fb(`/entrances/${entrance}/lift_pass/value`)}
-            />
-            <Control
-              {...ctl}
-              icon={MdElevator}
-              label="Грузовой"
-              keyName={`liftGruz-${entrance}`}
-              send={fb(`/entrances/${entrance}/lift_gruz/value`)}
-            />
-          </div>
-        </>
-      )}
-
-      {!isService && (
-        <>
-          <h2 className={c.section}>Калитки</h2>
-          <div className={c.grid4}>
-            {[1, 2, 3, 4].map((n) => (
-              <Control
-                key={n}
-                {...ctl}
-                icon={LuFence}
-                label={`Калитка №${n}`}
-                keyName={`kalitka${n}`}
-                send={fb(`/kalitka${n}/value`)}
-              />
-            ))}
-          </div>
-        </>
+      {!showParking && (
+        <p className={c.empty}>
+          У вас нет доступа к паркингу. Обратитесь к администратору, если это ошибка.
+        </p>
       )}
 
       {showParking && (
         <>
-          <h2 className={c.section}>Паркинг 1</h2>
-          <div className={c.grid2}>
-            <Control
-              {...ctl}
-              icon={TbBarrierBlock}
-              label="Шлагбаум"
-              keyName="shlagbaum"
-              send={relay("parking1", "barrier")}
-              unavailable={parkingUnavailable("parking1")}
-            />
-            <Control
-              {...ctl}
-              icon={MdLocalParking}
-              label="Ворота"
-              keyName="parking1"
-              send={relay("parking1", "gate")}
-              unavailable={parkingUnavailable("parking1")}
-            />
-          </div>
+          <section className={c.panel}>
+            <div className={c.panelHead}>
+              <h2 className={c.section}>Паркинг</h2>
+              <span className={c.panelNo}>1</span>
+            </div>
+            <div className={c.row}>
+              <Control
+                {...ctl}
+                icon={TbBarrierBlock}
+                label="Шлагбаум"
+                keyName="shlagbaum"
+                send={relay("parking1", "barrier")}
+                unavailable={parkingUnavailable("parking1")}
+              />
+              <Control
+                {...ctl}
+                icon={MdLocalParking}
+                label="Ворота"
+                keyName="parking1"
+                send={relay("parking1", "gate")}
+                unavailable={parkingUnavailable("parking1")}
+              />
+            </div>
+          </section>
 
-          <h2 className={c.section}>Паркинг 2</h2>
-          <Control
-            {...ctl}
-            variant="wide"
-            icon={MdLocalParking}
-            label="Ворота паркинга 2"
-            keyName="parking2"
-            send={relay("parking2", "gate")}
-            unavailable={parkingUnavailable("parking2")}
-          />
+          <section className={c.panel}>
+            <div className={c.panelHead}>
+              <h2 className={c.section}>Паркинг</h2>
+              <span className={c.panelNo}>2</span>
+            </div>
+            <div className={c.row}>
+              <Control
+                {...ctl}
+                icon={MdLocalParking}
+                label="Ворота"
+                keyName="parking2"
+                send={async () => {
+                  await sendRelayPulse("parking2", "gate");
+                  publishLock("parking2", "gate", PARKING2_LOCK_MS);
+                }}
+                unavailable={parkingUnavailable("parking2")}
+                lockLeft={lock2Left}
+                lockTotal={PARKING2_LOCK_MS}
+              />
+            </div>
+          </section>
         </>
       )}
     </div>

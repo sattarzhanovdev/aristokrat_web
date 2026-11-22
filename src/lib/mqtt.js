@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
  *   {prefix}/{device}/{relay}/cmd    приложение -> ESP, payload = id запроса
  *   {prefix}/{device}/{relay}/ack    ESP -> приложение, payload = тот же id
  *   {prefix}/{device}/{relay}/state  ESP -> приложение, "1" пока реле замкнуто, "0" после
+ *   {prefix}/{device}/{relay}/lock   приложение -> все (retained), время окончания блокировки, мс epoch
  *
  * Настройки берутся при сборке из .env.local (см. .env.example).
  */
@@ -24,7 +25,7 @@ const ACK_TIMEOUT_MS = 6000;
 
 let client = null;
 let users = 0;
-let snapshot = { connected: false, devices: {}, relays: {} };
+let snapshot = { connected: false, devices: {}, relays: {}, locks: {} };
 const listeners = new Set();
 const pending = new Map(); // id -> { resolve, reject, timer }
 
@@ -53,6 +54,9 @@ function onMessage(topic, payload) {
     }
   } else if (kind === "state") {
     emit({ relays: { ...snapshot.relays, [`${device}/${relay}`]: text === "1" } });
+  } else if (kind === "lock") {
+    const until = Number(text) || 0;
+    emit({ locks: { ...snapshot.locks, [`${device}/${relay}`]: until } });
   }
 }
 
@@ -77,7 +81,12 @@ async function connect() {
   client.on("connect", () => {
     emit({ connected: true });
     client.subscribe(
-      [`${CFG.prefix}/+/status`, `${CFG.prefix}/+/+/ack`, `${CFG.prefix}/+/+/state`],
+      [
+        `${CFG.prefix}/+/status`,
+        `${CFG.prefix}/+/+/ack`,
+        `${CFG.prefix}/+/+/state`,
+        `${CFG.prefix}/+/+/lock`,
+      ],
       { qos: 1 },
     );
   });
@@ -96,7 +105,7 @@ function disconnect() {
     p.reject(new Error("Соединение закрыто"));
   });
   pending.clear();
-  emit({ connected: false, devices: {}, relays: {} });
+  emit({ connected: false, devices: {}, relays: {}, locks: {} });
 }
 
 /**
@@ -126,6 +135,18 @@ export function sendRelayPulse(device, relay) {
       }
     });
   });
+}
+
+/**
+ * Общая блокировка реле для всех пользователей: retained-сообщение со временем
+ * окончания. Его получают и подключённые сейчас, и те, кто зайдёт позже.
+ */
+export function publishLock(device, relay, ms) {
+  if (!client || !snapshot.connected) return;
+  const until = Date.now() + ms;
+  // показываем блокировку сразу, не дожидаясь эха от брокера
+  emit({ locks: { ...snapshot.locks, [`${device}/${relay}`]: until } });
+  client.publish(`${CFG.prefix}/${device}/${relay}/lock`, String(until), { qos: 1, retain: true });
 }
 
 /** Подписка компонента на состояние MQTT (держит соединение, пока смонтирован). */

@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "aristokrat",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; BROWSER=none npm start"],
       "port": 3000
     }
   ]
