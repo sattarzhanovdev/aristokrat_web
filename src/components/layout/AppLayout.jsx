@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LuHouse, LuUser, LuShieldCheck, LuWifiOff } from "react-icons/lu";
+import { LuHouse, LuUser, LuShieldCheck, LuWifiOff, LuReceipt } from "react-icons/lu";
 import { useAuth } from "../../auth/AuthProvider";
 import { haptic } from "../../lib/native";
 import logo from "../../images/logo.svg";
@@ -9,16 +9,19 @@ import c from "./layout.module.scss";
 const TITLES = {
   "/": "Аристократ",
   "/profile": "Профиль",
-  "/admin": "Квартиры",
+  "/bills": "Счета",
 };
 
 export default function AppLayout() {
-  const { isAdmin, offline } = useAuth();
+  const { isAdmin, offline, billing } = useAuth();
   const { pathname } = useLocation();
+  const unpaid = billing?.open_count || 0;
 
   const tabs = [
     { to: "/", label: "Главная", icon: LuHouse, end: true },
-    ...(isAdmin ? [{ to: "/admin", label: "Квартиры", icon: LuShieldCheck }] : []),
+    ...(isAdmin
+      ? [{ to: "/admin", label: "Управление", icon: LuShieldCheck }]
+      : [{ to: "/bills", label: "Счета", icon: LuReceipt, badge: unpaid }]),
     { to: "/profile", label: "Профиль", icon: LuUser },
   ];
 
@@ -43,7 +46,7 @@ export default function AppLayout() {
       </main>
 
       <nav className={c.tabs} aria-label="Навигация">
-        {tabs.map(({ to, label, icon: Icon, end }) => (
+        {tabs.map(({ to, label, icon: Icon, end, badge }) => (
           <NavLink
             key={to}
             to={to}
@@ -52,7 +55,10 @@ export default function AppLayout() {
             onClick={() => haptic.tap()}
             className={({ isActive }) => `${c.tab} ${isActive ? c.tabActive : ""}`}
           >
-            <Icon className={c.tabIcon} />
+            <span className={c.tabIconWrap}>
+              <Icon className={c.tabIcon} />
+              {badge > 0 && <span className={c.badge}>{badge > 9 ? "9+" : badge}</span>}
+            </span>
             <span>{label}</span>
           </NavLink>
         ))}

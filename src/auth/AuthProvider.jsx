@@ -116,19 +116,37 @@ export function AuthProvider({ children }) {
     };
   }, [signedIn, revalidate]);
 
+  /** Обновить сводку по счетам (после оплаты или загрузки экрана «Счета»). */
+  const applyBilling = useCallback((billing) => {
+    if (!billing) return;
+    setUser((u) => {
+      if (!u) return u;
+      const next = { ...u, billing };
+      updateCachedUser(next);
+      return next;
+    });
+  }, []);
+
+  const isAdmin = isAdminUser(user);
+  const billing = user?.billing || null;
+
   const value = useMemo(
     () => ({
       user,
       signedIn,
       approved: isApproved(user),
-      isAdmin: isAdminUser(user),
+      isAdmin,
+      billing,
+      // заблокирован за неуплату: видит только счета (админа не блокируем)
+      blocked: !!billing?.blocked && !isAdmin,
+      applyBilling,
       offline,
       endedReason,
       signIn,
       signOut,
       revalidate,
     }),
-    [user, signedIn, offline, endedReason, signIn, signOut, revalidate],
+    [user, signedIn, isAdmin, billing, applyBilling, offline, endedReason, signIn, signOut, revalidate],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
