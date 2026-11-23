@@ -215,8 +215,8 @@
       margin-top: 0;
       margin-bottom: 0;
     }
-    padding-left: max(20px, env(safe-area-inset-left));
-    padding-right: max(20px, env(safe-area-inset-right));
+    padding-left: max(20px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    padding-right: max(20px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
   }
   .hero {
     max-width: 280px;

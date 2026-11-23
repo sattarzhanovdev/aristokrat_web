@@ -1,4 +1,4 @@
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
 export const isNative = Capacitor.isNativePlatform();
@@ -27,14 +27,10 @@ export async function initNative() {
   if (!isNative) return;
   document.documentElement.classList.add("native", `platform-${platform}`);
   try {
-    const { StatusBar, Style } = await import("@capacitor/status-bar");
-    const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-    await StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light });
-    if (platform === "android") {
-      // На Android WebView не всегда отдаёт safe-area, поэтому статус-бар не накладываем
-      await StatusBar.setOverlaysWebView({ overlay: false });
-      await StatusBar.setBackgroundColor({ color: dark ? "#0b0d12" : "#f3f4f7" });
-    }
+    // Приложение рисуется под статус-баром (edge-to-edge, обязательно с Android 16).
+    // Отступы берутся из --safe-area-inset-* (Android) / env(safe-area-inset-*) (iOS),
+    // цвет значков следует теме устройства.
+    await SystemBars.setStyle({ style: SystemBarsStyle.Default });
   } catch {}
   try {
     const { SplashScreen } = await import("@capacitor/splash-screen");

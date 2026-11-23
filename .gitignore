@@ -22,3 +22,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+
+# ключи подписи — никогда в git
+android/keystore.properties
+*.jks
+*.keystore
+store/**/*.aab
