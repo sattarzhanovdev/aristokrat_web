@@ -1,6 +1,10 @@
 import axios from "axios";
+import { readSession } from "../auth/session";
 
-export const API_BASE = "https://aristokratamanat.pythonanywhere.com";
+// REACT_APP_API_URL в .env.local — например, http://127.0.0.1:8000 для локального бэкенда
+export const API_BASE = (
+  process.env.REACT_APP_API_URL || "https://aristokratamanat.pythonanywhere.com"
+).replace(/\/$/, "");
 
 /**
  * Один HTTP-клиент на всё приложение.
@@ -11,6 +15,16 @@ export const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
   timeout: 20000,
+});
+
+// Токен (выдаётся при логине) — для счетов и админ-панели
+api.interceptors.request.use((config) => {
+  const token = readSession()?.user?.token;
+  if (token && !config.headers?.Authorization) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 /** Ошибка, которую можно показать пользователю как есть. */
@@ -34,7 +48,20 @@ export function toApiError(e, fallback = "Что-то пошло не так") {
     );
   }
   const d = res.data;
-  const msg =
-    (d && typeof d === "object" && (d.message || d.detail)) || fallback;
+  const msg = (d && typeof d === "object" && firstMessage(d)) || fallback;
   return new ApiError(String(msg), { status: res.status });
+}
+
+/** Достаёт первое человеческое сообщение из ответа DRF ({message}, {detail}, {field: [..]}). */
+function firstMessage(d) {
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) return firstMessage(d[0]);
+  if (d && typeof d === "object") {
+    if (d.message) return firstMessage(d.message);
+    if (d.detail) return firstMessage(d.detail);
+    if (d.non_field_errors) return firstMessage(d.non_field_errors);
+    const k = Object.keys(d)[0];
+    return k ? firstMessage(d[k]) : "";
+  }
+  return "";
 }

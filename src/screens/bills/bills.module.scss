@@ -1,0 +1,352 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: pageIn 0.4s var(--ease);
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(140deg, var(--navy-700), var(--navy-900));
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+.summaryLabel {
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+.summaryValue {
+  font-size: 34px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.summarySub {
+  font-size: 14px;
+  opacity: 0.75;
+}
+
+.h2 {
+  margin: 10px 4px 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+
+.notice {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* --- Карточка счёта --- */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card_blocking {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+.card_overdue {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.cardTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cardName {
+  font-size: 17px;
+  font-weight: 650;
+}
+.cardSub {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 650;
+  svg {
+    font-size: 12px;
+  }
+}
+.pill_issued {
+  background: var(--navy-tint);
+  color: var(--accent);
+}
+.pill_overdue {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+.pill_blocking {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.pill_paid {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.pill_cancelled {
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+
+.amount {
+  font-size: 26px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.desc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.4;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-2);
+  svg {
+    flex-shrink: 0;
+    color: var(--ink-3);
+  }
+}
+
+.warn {
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--warning-text);
+  font-weight: 550;
+}
+
+.payBtn {
+  margin-top: 4px;
+}
+
+/* --- История --- */
+.history {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.hRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  & + & {
+    border-top: 1px solid var(--hairline);
+  }
+}
+.hMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hTitle {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hSub {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.hAmount {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hStrike {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 0 12px;
+  color: var(--ink-3);
+  svg {
+    font-size: 34px;
+  }
+  p {
+    margin: 0;
+    font-weight: 600;
+  }
+}
+
+.state {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+  color: var(--ink-2);
+  padding: 32px 0;
+}
+
+.skeleton {
+  height: 150px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.checking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: var(--navy-tint);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+  .spinner,
+  span:first-child {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* --- Экран блокировки --- */
+.blockedShell {
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + 32px) var(--gutter) calc(var(--safe-bottom) + 24px);
+  background: var(--bg);
+}
+.blockedInner {
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: pageIn 0.4s var(--ease);
+}
+.lockOrb {
+  width: 72px;
+  height: 72px;
+  margin: 8px auto 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 32px;
+}
+.blockedTitle {
+  margin: 0;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+}
+.blockedText {
+  margin: 0 0 4px;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.blockedTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  span {
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+  b {
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+}
+.blockedFoot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.footLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.footMuted {
+  color: var(--ink-3);
+}

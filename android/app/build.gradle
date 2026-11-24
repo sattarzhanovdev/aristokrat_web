@@ -1,8 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Ключ подписи для Google Play: android/keystore.properties (в git не попадает).
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
-    namespace "kg.aristokrat.app"
-    compileSdk rootProject.ext.compileSdkVersion
+    namespace = "kg.aristokrat.app"
+    compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "kg.aristokrat.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -13,11 +20,24 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile = rootProject.file(keystoreProps["storeFile"])
+                storePassword = keystoreProps["storePassword"]
+                keyAlias = keystoreProps["keyAlias"]
+                keyPassword = keystoreProps["keyPassword"]
+            }
         }
     }
     buildTypes {
         release {
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

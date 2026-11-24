@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { LuCheck, LuCircleAlert, LuLock, LuWifiOff } from "react-icons/lu";
 import { MdLocalParking } from "react-icons/md";
+import { Link } from "react-router-dom";
+import { LuChevronRight, LuReceipt } from "react-icons/lu";
 import BarrierIcon from "../../components/ui/BarrierIcon";
+import { dueText, fmtDate, money } from "../../api/billing";
 import { useAuth } from "../../auth/AuthProvider";
 import { useToast } from "../../components/ui/Toast";
 import { haptic } from "../../lib/native";
@@ -83,7 +86,7 @@ function Control({ icon: Icon, label, keyName, send, live, status, onPress, unav
 }
 
 export default function Main() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, billing } = useAuth();
   const toast = useToast();
   const { status, run } = usePulse();
 
@@ -169,6 +172,23 @@ export default function Main() {
           )}
         </div>
       </section>
+
+      {!isAdmin && billing?.open_count > 0 && (
+        <Link to="/bills" className={`${c.billBanner} ${billing.overdue_count ? c.billBannerWarn : ""}`}>
+          <span className={c.billIcon}>
+            <LuReceipt />
+          </span>
+          <span className={c.billText}>
+            <b>К оплате {money(billing.outstanding, billing.currency)}</b>
+            <span>
+              {billing.next_due
+                ? `До ${fmtDate(billing.next_due, { year: false })} · ${dueText(billing.next_due)}`
+                : "Откройте, чтобы оплатить"}
+            </span>
+          </span>
+          <LuChevronRight className={c.billChevron} />
+        </Link>
+      )}
 
       {!showParking && (
         <p className={c.empty}>

@@ -121,8 +121,8 @@
 /* альбомная ориентация: иконка и подпись в строку, панель ниже */
 @media (orientation: landscape) and (max-height: 500px) {
   .tabs {
-    padding-left: max(10px, env(safe-area-inset-left));
-    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(10px, var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+    padding-right: max(10px, var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
   }
   .tab {
     flex-direction: row;
@@ -141,8 +141,8 @@
 /* боковые вырезы (iPhone в альбомной) */
 .topInner,
 .content {
-  padding-left: max(var(--gutter), env(safe-area-inset-left));
-  padding-right: max(var(--gutter), env(safe-area-inset-right));
+  padding-left: max(var(--gutter), var(--safe-area-inset-left, env(safe-area-inset-left, 0px)));
+  padding-right: max(var(--gutter), var(--safe-area-inset-right, env(safe-area-inset-right, 0px)));
 }
 
 .tabActive {
@@ -151,4 +151,26 @@
   .tabIcon {
     transform: translateY(-1px) scale(1.06);
   }
+}
+
+.tabIconWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -10px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--surface);
 }
